@@ -1,0 +1,57 @@
+[
+  {
+    "file": "03_プログラマー向け_実装設計書.pdf",
+    "sha256": "50c1b3c5f536d32a6f1474fe62b428f639b009fd46a8a0811ccff7cac3ff1204",
+    "bytes": 39365
+  },
+  {
+    "file": "10_UI_UX_画面遷移設計書.pdf",
+    "sha256": "ecb5f12508e0bb89b6e8896354850d9b32c1bf9083853ea920af5ef66c29c420",
+    "bytes": 38395
+  },
+  {
+    "file": "05_QA_運用_WBS_リリース計画.pdf",
+    "sha256": "d94d3063a29f47ee70673e44a21bd1f35c24111984492ec3cef84f82cc7ce15f",
+    "bytes": 25726
+  },
+  {
+    "file": "11_金融保管物流交通_統合詳細仕様_Ver1.0.txt",
+    "sha256": "dca7246e5831a5d92af7f99210107f91aed8e5cfb8db39348bcd1092178aa0a9",
+    "bytes": 118889
+  },
+  {
+    "file": "06_NPC_AI_詳細設計書.pdf",
+    "sha256": "5e6c47ee9e79436aa0a5abe5aa8abed796e3d82a93f5840ea744797201c3b7c6",
+    "bytes": 37933
+  },
+  {
+    "file": "04_NPC_AI_経済_専門設計書.pdf",
+    "sha256": "edd3108f5610ea19ab40331d1d3901c0d2063b2e3027de86e67eaa6693babb97",
+    "bytes": 25861
+  },
+  {
+    "file": "09_ワールドシミュレーション設計書.pdf",
+    "sha256": "8be1bb9b7d9b8f2f0e6c196f979ceec463aa371da3fcb3b6e371d2b5da52cef6",
+    "bytes": 32832
+  },
+  {
+    "file": "08_クエスト_ジョブ生成設計書.pdf",
+    "sha256": "1af6e2be2298c75d5ba2e2a8ff707865bcca247c8273e3e17e2c943584587c40",
+    "bytes": 36789
+  },
+  {
+    "file": "01_企画書_事業計画_ゲームデザイン.pdf",
+    "sha256": "351fbd9a23586557d1c5967ec38400187beeee66befb94263e4ddfebc05ed7e7",
+    "bytes": 33466
+  },
+  {
+    "file": "07_経済_アイテム循環設計書.pdf",
+    "sha256": "02ce053561b1adfd6975bc7871b055b1a140cfc8a1010696ebd30cc619784334",
+    "bytes": 36986
+  },
+  {
+    "file": "02_要件定義書_機能非機能受入基準.pdf",
+    "sha256": "127b3d19b2cca76e9e7bef403c7fa179ceda03ae9c789f813085eeb2fd446805",
+    "bytes": 74158
+  }
+]

@@ -1,0 +1,1435 @@
+LIVING WORLD  ─  第6章 統合詳細仕様書
+金融・保管・物流・交通・技術水準
+仕様案 Ver.1.0（再構成・第1～5章連携強化版）
+作成日：2026年10月21日
+対象：企画責任者／ゲームデザイナー／サーバー・AI・DB・クライアント開発者／QA／運営
+状態：設計ベースライン案（未承認の提案・パラメータ・仕様を含む）
+
+────────────────────────────────────────────────────────────────────
+文書運用上の重要事項
+────────────────────────────────────────────────────────────────────
+1. 本書は添付の既存「第6章 金融・保管・物流・交通システム」を置き換えるための統合原稿である。
+2. 同時に、既存のLIVING WORLD企画書・開発者向け要件定義書・統合設計書・実装設計書で確認できた、
+   第1～5章相当（世界、職業、NPC、AI、クエスト）の方針を横断反映している。
+3. 仕様の表記は次の通り。
+   【既定方針】元第6章または確認できた関連資料で採用方向が明記された方針。
+   【設計案】本改訂で具体化した推奨実装・例・式・パラメータ。承認前に確定仕様と扱わない。
+   【要決定】数値・ルール・範囲など判断が必要な事項。
+   【禁止条件】設計上、満たすべき不変条件または採用しない方式。
+4. Must/Should/Couldは元第6章の要求優先度。P0/P1/P2は開発フェーズであり別軸とする。
+5. NPC約10,000体・村約100単位は目標規模であり、実測で達成済みの性能値ではない。
+6. 具体的な手数料、保険料率、移動速度、重量閾値、時代・魔法の例外は別途承認・検証を要する。
+
+────────────────────────────────────────────────────────────────────
+目次
+────────────────────────────────────────────────────────────────────
+6.1 目的・非目的・ゲーム体験
+6.2 第1～5章および既存関連仕様からの継承事項
+6.3 事業ルール・不変条件・責務の境界
+6.4 世界地理・時間・施設・交通網
+6.5 物理アイテム・収納・容量・重量・体積
+6.6 貸金庫・安全保管の詳細
+6.7 通貨・口座・銀行・決済の詳細
+6.8 輸送・配送・商隊の詳細
+6.9 乗り物・交通・経路・事故の詳細
+6.10 NPC自律商業・生活・情報伝播
+6.11 地域経済・生産・需要・価格への波及
+6.12 冒険者ギルド・クエスト・契約・護衛
+6.13 犯罪・司法・窃盗・賠償・紛争
+6.14 死亡・遺品・ダンジョンとの統合
+6.15 中世ヨーロッパ相当の技術水準・魔法の境界
+6.16 UI/UX・チュートリアル・アクセシビリティ
+6.17 システム構成・サーバー権威・同期
+6.18 データ設計（論理モデル・制約）
+6.19 API・イベント・状態遷移・擬似コード
+6.20 料金・リスク・需給・容量の暫定数理モデル
+6.21 異常系・障害復旧・不正防止・監査
+6.22 複合シナリオ（世界内の因果連鎖）
+6.23 機能要件一覧（要求ID・優先度）
+6.24 受入テスト・非機能テスト・不変条件テスト
+6.25 ロードマップ・段階実装・依存関係
+6.26 未決定事項・意思決定優先順位
+6.27 出典対応・変更点・整合性チェック
+
+6.1 目的・非目的・ゲーム体験
+────────────────────────────────────────────────────────────────────
+6.1.1 基本理念【既定方針】
+プレイヤーが『無限のインベントリを持つ超越的存在』として経済活動を飛ばすのではなく、
+保管、運搬、労働、商売、護衛、情報、信用、治安、施設維持が互いに制約となる持続的社会を構築する。
+NPC・プレイヤーの行動によって市場価格、都市の在庫、雇用、道路状況、商人の評判、冒険依頼が変化する。
+特定のクエストのために商品・通貨・完成装備を無から増やさず、世界全体の因果を維持する。
+
+6.1.2 期待するプレイ体験
+・探検家：遠征で持ち帰る品を選別し、危険な道のりを計画する。
+・商人：地域別需給と情報遅延を踏まえて仕入れ、販売、運送、保険、護衛を判断する。
+・運送業者：積載、交通、納期、治安、契約の順守で収益を得る。
+・冒険者：商隊護衛、強盗調査、遺品回収、輸送路奪還によって収入・評判・人間関係を得る。
+・鍛冶師・職人：仕入れ遅延や資材不足に対応し、品質と製作者来歴を備えた人工物を供給する。
+・銀行・両替業関係者：現金・預り証・信用に基づく商いが社会的価値を持つ。
+・都市住民：道路破壊、物流途絶、補修、復旧が身の回りの価格や雇用へ波及する。
+
+6.1.3 非目的・採用しない設計【禁止条件】
+・全物理アイテムの無制限携行・無条件の瞬間倉庫共有。
+・銀行内の保管資産が通常の戦争、強盗、NPC犯罪、死亡で消失する仕様。
+・輸送依頼の成立と同時に、実物を目的地へ即時コピーする処理。
+・NPCやLLMの発言だけで残高、所有権、移動先、実際の配達完了が確定する処理。
+・商品が不足した際、商人や宝箱が完成品を無から自動生成する処理。
+・現代的電子送金やスマートフォンに相当する技術の無条件導入。
+
+6.2 第1～5章および既存関連仕様からの継承事項
+────────────────────────────────────────────────────────────────────
+6.2.1 第1章相当：世界・時間・地理【既定方針】
+・世界は村・都市・街道・農地・鉱山・森林・河川・港・ダンジョン・国家領域からなる。
+・場所ごとに距離、標高、通行可否、道路品質、危険度、管轄、資源、施設状態を持つ。
+・季節、天候、日付、昼夜は交通、農業、NPC生活、治安、商業需要へ影響する。
+・災害・戦争による橋梁や城壁の破損は一時的な演出ではなく持続的な世界状態となる。
+・村約100単位、NPC約10,000体は計画目標。各村の人口や産業規模は均一ではない。
+⇒第6章への帰結：物流は道路グラフ・施設台帳・時間・危険性を参照し、地域による非対称性を維持する。
+
+6.2.2 第2章相当：キャラクター・成長・ジョブ【既定方針】
+・全プレイヤーの初期ジョブは「無垢」。初期訓練と日常依頼から基礎職を比較的早期に開放する。
+・職の適性、行動履歴、NPCとの縁、地域、評判、確率によって希少な転職機会が生じる。
+・剣術・鍛冶・商売・採集などの技能は難度、成果、反復、師事によって変化する。
+・職の希少性はそのまま戦闘・経済能力の絶対的優越を意味しない。
+⇒第6章への帰結：運送・鑑定・修理・金融・物流・馬の管理を仕事や技能として伸ばせる余地を設ける。
+  商人・職人・運送業者への関与は生活型プレイヤーにも独立した価値を与える。
+
+6.2.3 第3章相当：NPC人格・生活・人間関係【既定方針】
+・NPCには職務、資産、欲求、性格、信頼、知識、居住地、予定、記憶、評判、所属がある。
+・同じ場所・同じ馬車・定期市・宿屋での再会は関係の変化や仕事の紹介につながる。
+・侮辱、契約違反、窃盗、未払い、負傷は交渉、仲裁、訴訟、報復や警備雇用へ派生し得る。
+・NPCが死亡しても、その個人の債務・財産・契約・家族への影響が無条件に消去されない。
+⇒第6章への帰結：荷主・運送業者・護衛・銀行担当NPCの信頼・経験・資力・知識を意思決定へ反映する。
+
+6.2.4 第4章相当：AI・村集約・イベント駆動【既定方針】
+・可視の近傍NPCは個体レベル、同村の非可視NPCは簡略、遠方の村は集約してシミュレートする。
+・日常行動はルール・行動木・状態機械・効用値を主として扱い、LLMは会話や非定型提案に限定する。
+・遠隔村の簡略更新であっても、プレイヤーが訪問した際に資産・在庫・所在が矛盾してはならない。
+・AI停止中も生産、輸送、契約、資産処理は既定ルールによって進行する。
+⇒第6章への帰結：NPC商人の意思決定と物流進捗は独立サービスが確定し、LLMは取引を承認しない。
+
+6.2.5 第5章相当：クエスト・発見・受注権・契約【既定方針】
+・依頼は在庫不足、道路閉鎖、事故、治安悪化、施設破壊、対立、NPCの目標等から自然に生成される。
+・公開／招待／単独／複数人／ギルド限定の依頼を区別し、信頼、評判、資格、期限を確認する。
+・依頼主の現物資産または通貨から報酬を事前確保する。報酬が不足する依頼を成立させない。
+・依頼は受注、進行、証拠提出、検証、精算、取消、紛争処理の状態を持つ。
+⇒第6章への帰結：輸送・護衛・損害調査・遺品回収・橋修繕をクエストと別の偽世界で処理せず、
+  一つの物流／司法／契約の実状態へ連結する。
+
+6.2.6 第6章以外の横断資料に明記された関連方針【既定方針】
+・死亡時：携行アイテム全喪失、レベル2低下（下限あり）、携行金の一部喪失が基本。
+  貸金庫の預入資産は完全に保護し、金銭喪失率とレベル下限は要決定。
+・天然資源（鉱石・木材・薬草等）およびモンスターは条件付きで再生できるが、完成人工物は生産が必要。
+・死亡装備は現物IDを保ったまま地面、ダンジョンプール、宝箱、モンスターへ移る。
+・市場は村×品目の在庫・注文・需要・購買力・生産・税・物流費で形成する。
+・城壁・橋・倉庫等の破壊は修理材料、労働、税・公共事業予算、ギルド契約を必要とする。
+・FPSは一人称視点の意味であり、近代銃導入の確約ではない。中世相当技術と魔法を基本とする。
+
+6.3 事業ルール・不変条件・責務の境界
+────────────────────────────────────────────────────────────────────
+6.3.1 アイテム不変条件【禁止条件】
+I-01 すべての非スタック物理アイテムは一意のitem_instance_idを持つ。
+I-02 同一item_instance_idは同時刻の確定状態で、ただ一つの所在にのみ存在する。
+I-03 現物の移動は所在の移転であり、生成イベントではない。
+I-04 完成人工物を増やすのは、レシピ・素材・作業・設備等を検証した製造確定だけ。
+I-05 分割可能な素材スタックは分割・統合時に数量保存とID履歴を残す。
+I-06 世界内で紛失してもシステム上の監査IDと最後の所在・所有権記録は保持する。
+
+6.3.2 通貨・債権の不変条件【禁止条件】
+C-01 通貨の勘定移動はすべて貸借の対を持ち、通常の移転で通貨総量を増やさない。
+C-02 通貨の発行・消滅には特権勘定、理由コード、承認権限、監査証跡を用いる。
+C-03 預り証・為替手形・銀行預金の請求権は「現金そのもの」と混同せず、裏付けと債務者を明示する。
+C-04 現金の輸送と債権の名義変更を別の事象として表現する。
+C-05 手数料・税・賠償・報酬は支払元と受取先を明示し、自動的な資金湧出を禁止する。
+
+6.3.3 安全保管・物流の不変条件
+V-01 貸金庫内に確定保管された資産は死亡、戦争、強盗、施設破壊、NPC犯罪によって喪失しない。
+V-02 施設が使えなくても資産の法的／ゲーム上の所有権は維持される。
+V-03 「安全な保管中」「輸送契約で搬送中」は同時に成立させない。
+V-04 貸金庫から目的地への配送を発注しても、荷物が安全保管を離れた時点から輸送リスクを扱う。
+V-05 実物流を経ない同施設内振替と、地域間の現物移動を混同しない。
+V-06 受領確認と保管残高の更新は重複実行しても成果物が増えない。
+
+6.3.4 責務境界
+・Game Server：移動・衝突・重量・積載・戦闘・ローカルイベントを権威判定。
+・World/Route：街道、橋、港、河川、季節、天候、地理、通行可否。
+・Economy/Market：村別需給、売買注文、在庫・価格、取引履歴。
+・Ledger/Inventory：アイテムID、所有権、所在、通貨勘定、手数料、監査。
+・Vault/Bank：保管指示、施設・口座権限、受領・預入・払出・金融契約。
+・Logistics：配送申込、経路、運送業者、積荷、移動進捗、追跡。
+・NPC Simulation：職務・生活・需要認識・仕入れ・護衛募集の意思決定。
+・Quest/Contract：依頼適格性、報酬エスクロー、期限、証拠、精算。
+・Law/Justice：盗難認定、物権と占有の区別、証拠、管轄、賠償。
+・AI Gateway：会話・交渉文の生成候補。取引・権利・残高の確定権限なし。
+・Client：入力、表示、補間、確認UI。確定したゲーム状態を自己申告しない。
+
+6.4 世界地理・時間・施設・交通網
+────────────────────────────────────────────────────────────────────
+6.4.1 地理モデル【設計案】
+World → Nation → Region → Settlement → Facility の階層と、街道／海路／河川／橋を結ぶ有向グラフを併用する。
+Settlementは村・町・都市・港町等のタイプ、人口、施設数、産業、治安、交易量、税、領主、ギルド支配を持つ。
+RouteEdgeは始点、終点、距離、高低差、幅、路面状態、橋梁状態、通行権、季節閉鎖、危険度、輸送種別適合性を保持。
+
+6.4.2 施設分類【設計案】
+・貸金庫：保管台帳と安全な預入／引出機能を持つ。
+・銀行／金融商会：預り証・両替・口座／手形決済を将来拡張できる。
+・市場：現物在庫・取引・相場・税を持つ。
+・倉庫：所有者指定の通常保管。貸金庫と異なり、攻撃・火災・盗難リスクは運営ルールによる。
+・厩舎／車庫：馬、荷馬、馬車、車輪・飼料・装具を管理する。
+・集荷所／配送拠点：荷物の受付・仕分け・積替え・待機。
+・港・河岸：船舶の荷役・天候待機・積載・貨物検査。
+・ギルド：契約掲示、身元確認、報酬保全、護衛の募集。
+・関所／役所：通行税、許可、検問、犯罪対応、橋梁復旧の公的判断。
+
+6.4.3 貸金庫の設置条件【既定方針＋要決定】
+中規模以上の村・都市には原則として設置する。中規模の人口閾値・交易量・施設数は要決定。
+小村には貸金庫が無い場合があり、最寄りの保管所まで運ぶ選択を残す。
+都市の被災・戦争時でも資産自体は保護されるが、窓口利用や物流は停止・迂回する場合がある。
+
+6.4.4 時間モデル【設計案】
+・実時間とゲーム内時間の倍率、日付、タイムゾーン相当の地域表現を統一設定する。
+・銀行窓口時間、定期馬車、商隊集合、航行季節、潮汐・天候待ちをゲーム内時刻と連動可能にする。
+・プレイヤー不在時の村集約更新を許容する一方、約束した配達期限の基準時間は契約に固定する。
+・時刻変更・メンテナンスは期限再計算の監査イベントを伴う。実時間／ゲーム時間の混同を避ける。
+
+6.5 物理アイテム・収納・容量・重量・体積
+────────────────────────────────────────────────────────────────────
+6.5.1 アイテム属性【既定方針＋設計案】
+item_type_id, instance_id, display_name, material, mass_kg, volume_l, shape, dimensions,
+stackability, max_stack, durability, condition, quality, ownership_status, creator_id,
+production_location, provenance, hazardous_flag, perishability, temperature_sensitivity,
+required_container, transport_tags, value_estimate, equip_slot を候補とする。
+自然素材の重量・体積は数量に比例し、加工品は完成品単位で保持する。
+
+6.5.2 携行容量と適合条件【設計案】
+・重量容量＝身体能力＋装備／技能補正。ただし筋力と鞄の重量容量を単純加算しない方式も比較する。
+・体積容量＝背嚢・袋・ベルト・馬具・荷台・荷室の有効収納容積。
+・収納条件＝長尺品、液体、壊れ物、生鮮物、火気、動物の扱い。禁止組合せは事前拒否。
+・収納は階層的に追跡し、袋の中の袋による無限圧縮／容量増加を禁止する。
+・大きな木材や長槍は軽くても普通の鞄に入らない。必要なら手持ち、牽引、荷馬車を選ぶ。
+
+6.5.3 積載率の基本定義【設計案】
+  mass_ratio = effective_mass / effective_mass_capacity
+  volume_ratio = occupied_volume / available_volume_capacity
+  load_ratio = max(mass_ratio, volume_ratio)
+収納に適合しない品は比率に関係なく収納不可。体積が空いていても重い貨物は搬送不可。
+物理的なキャラクターの装備重量、持ち物、運搬中の箱・武器なども含む。
+
+6.5.4 暫定の負荷段階【既定の暫定値】
+・0～50%       ：軽量　通常移動。
+・50%超～75%   ：標準　スタミナ消費がやや増える。
+・75%超～100%  ：重量　走行速度低下、スタミナ消費増。
+・100%超～125% ：過積載　走行・回避等に強い制限（徒歩／押し歩きは別途調整）。
+・125%超       ：搬送不可。新規拾得・積込みを拒否。
+※境界は重複させず実装し、値はゲームバランス検証まで暫定。UIは重量・体積の両方を表示。
+
+6.5.5 演算と更新【設計案】
+・拾得、製造完了、売買、預入、引出、装備変更、死亡、荷卸し、乗降で容量を再検証。
+・サーバーは移動速度、加速、回避距離、スタミナ、落下・泳ぎ等への影響を最終判定する。
+・重すぎる荷物を一時的に拾えない場合、対象の位置を変えず、取得失敗理由を出す。
+・アイテム分割では実数丸めで質量が失われないよう整数最小単位を使う。
+・仲間に渡す、地面に置く、分割する、馬に積む、配送委託する、貸金庫へ預ける選択を用意。
+
+6.5.6 馬・車・船の積載【設計案】
+・動物は体重、体力、成長、負傷、飼料、装具、気候耐性、速度、運べる重量・体積を持つ。
+・車両は車軸耐荷重、荷室容積、牽引可能重量、路面適合、故障率、操縦者技能、乗員枠を持つ。
+・船は喫水／船倉、港の制限、水深、積付け、天候、乗員、航路を持つ。
+・一つの貨物が馬・荷台・プレイヤーの複数箇所へ同時搭載されないようItemLocationを管理する。
+・荷馬車の荷物には積載率を適用し、容量超過は出発不可または走行性能低下とする。
+
+6.6 貸金庫・安全保管の詳細
+────────────────────────────────────────────────────────────────────
+6.6.1 対象と保護境界【既定方針】
+中規模以上の村と都市の貸金庫に、所有する装備、素材、通貨等を預入・引出できる。
+預入確定済み資産はプレイヤー死亡・襲撃・強盗・NPC犯罪・戦争・貸金庫建物の被害によって喪失しない。
+貸金庫保管品を取得可能なワールドオブジェクトとして置かない。運営用資産台帳上で一意に管理する。
+
+6.6.2 利用単位【設計案】
+・facility_id：都市別貸金庫施設の一意ID。
+・vault_id：所有者または契約主体に紐づく保管枠。
+・owner_actor_id：プレイヤー／NPC／ギルド等の権利主体。
+・vault_entry_id：預入品単位の保管記録。非スタック品はitem_instance_idと紐づく。
+・authorized_actor：代理引出を許した人物と権限、有効期限、委任証拠。
+・capacity_plan：枠数／重量／体積／特殊設備の候補。確定容量基準は要決定。
+
+6.6.3 正常操作【設計案】
+預入：施設利用権限照合→アイテム所有権・所在確認→預入可否・容量・手数料確認→
+      アイテム所在をIN_VAULTへ一括移転→台帳保存→確定通知→預入証明を表示。
+引出：所有・代理権限照合→保管状態・未予約確認→受領場所の重量・体積検証→
+      所在をPLAYER_INVENTORYなどへ移転→記録・通知。
+配送申込：預入品の指定→発送費用見積→危険・保険条件提示→契約成立→
+          集荷用予約→受渡確定時点でIN_TRANSITに切替。
+履歴照会：日時、施設、アイテム、操作主体、数量、請求額、原因取引ID、状態を表示する。
+
+6.6.4 預入と死亡・強盗の競合【設計案】
+同一item_instance_idのversionを条件にトランザクションを確定する。
+・預入が先に確定：当該品は死亡処理の携行品対象から除外される。
+・死亡が先に確定：当該品は死亡プール・遺品へ移り、預入はITEM_NOT_AVAILABLEで失敗。
+・施設襲撃はVaultEntryの所在・所有を変更できない。
+・預入確定前にワールド上で所有権が失われていたら預入成功にしない。
+
+6.6.5 施設停止／破壊／占領【既定方針＋設計案】
+・vault_operational_status は OPEN / CLOSED / DAMAGED / OCCUPIED / UNDER_REPAIR / RELOCATED。
+・稼働状態が悪化してもVaultEntryの確定保管資産は消さず、台帳と復旧手段を維持する。
+・利用不可時の出金／引出は保留して再開時に取り扱う。代替施設での引出はサーバー承認フローに限定。
+・代替施設の使用を「荷物の自動瞬間移動」と誤認させないよう、ゲーム内演出・権利処理を区別する。
+・侵攻側が保管台帳を強奪して現物を取り出すことは通常ルールではできない。
+
+6.6.6 施設の安全性と通常倉庫の違い【設計案】
+貸金庫：保護された台帳内の安全資産。費用や距離・利便性を制約とする。
+通常倉庫：実ワールド上の建物・貯蔵庫。火災・戦争・盗難・破損等のリスクを持ち得る。
+荷役所：配送待ち・輸送中貨物の仮置場。安全保管扱いではなく、契約条件の補償に従う。
+この3区分を混同しない。ギルドの共用倉庫にも同じ区分の定義が必要。
+
+6.6.7 手数料と利用制限【要決定】
+・初回無料枠を設けることを推奨。死亡後の再出発可能性を守る。
+・預入手数料、継続保管料金、容量追加、大型・危険品、施設・地域別価格はゲームバランス検証で確定。
+・料金未払いでも既定の安全保管資産が消滅する仕組みは採用しない。停止・容量制限等の代替制裁を検討。
+・非譲渡品、違法品、腐敗品、契約で占有が制限された物の取扱いは個別ルールを定義する。
+
+6.7 通貨・口座・銀行・決済の詳細
+────────────────────────────────────────────────────────────────────
+6.7.1 前提【既定方針】
+生活技術は中世欧州相当。主要決済は硬貨や現物で表現し、現代の電子決済／即時送金は無条件に導入しない。
+預入硬貨、携行硬貨、銀行預金請求権、為替手形、貸付債務、保険の補償請求権を別概念として扱う。
+
+6.7.2 金融資産の分類【設計案】
+・現物硬貨（COIN_PHYSICAL）：個数と単位を持つ物理貨幣。携行重量が発生する。
+・保管現金（COIN_IN_VAULT）：貸金庫へ預けた通貨。安全、引出には施設の操作が必要。
+・預金債権（DEPOSIT_CLAIM）：銀行に対する払戻請求権。導入可否・責任は別途承認。
+・手形／預り証（BILL_OR_RECEIPT）：指定条件のもとで支払いを請求できる証書。
+・信用枠／貸付（LOAN）：貸手、借手、元本、利息、期限、担保、債務履行状態を持つ。
+・商品信用（TRADE_CREDIT）：分割払い、納品後支払など。物流契約の証拠に紐づける。
+
+6.7.3 区分別の危険【設計案】
+現物硬貨：盗難／死亡／輸送中喪失の対象。
+貸金庫保管硬貨：死亡／通常襲撃では保護。
+手形・預り証の紙片：現物が紛失する場合があるが請求権の存否・再発行可否は制度別。
+銀行預金：銀行制度・準備資産・信用リスクを定義するまで無制限に引出可能な機能を確約しない。
+
+6.7.4 銀行間の資金移動【既定方針＋設計案】
+都市Aの銀行から都市Bへ資金を動かす方法候補は以下。
+A. 現物輸送：貨幣を荷物として運び、距離・盗難・護衛・重量の制約を受ける。
+B. 支払指図／為替手形：銀行間信用と決済残高が十分な場合に、Bの拠点で払い出す。
+C. 後日清算：銀行間の純債権を記録し、周期的に実際の硬貨や商品・資産で清算する。
+※B・Cは拡張機能。相手銀行の準備残高・取扱権限を無視した即時硬貨生成は禁止。
+
+6.7.5 残高・信用・裏付け【設計案】
+・複式仕訳では全LedgerEntryの各取引についてdelta合計＝0を基本とする。
+・銀行間債務は片側の資産と他方の負債として相殺・清算可能にする。
+・自社内の保護されたVaultEntryと一般銀行預金勘定は混ぜない。
+・預金払い戻し能力、準備率、貸付限度、破綻処理、利息の発生源は要決定。
+・信用と評判はNPC・商人の選択へ影響するが、資金残高以上の強制決済を許さない。
+
+6.7.6 金融上の不正・紛争【設計案】
+預り証偽造、債務不履行、二重譲渡、口座の不正代理操作、両替詐欺、輸送中現金強奪を区別する。
+物理的な証書を奪うことと債権者の地位を取得することは同一ではない。裏書・本人確認・裁判を検討する。
+NPC金融取引は残高・貸出規則・記録により制限。LLMの「送金済み」という台詞だけで残高を動かさない。
+
+6.8 輸送・配送・商隊の詳細
+────────────────────────────────────────────────────────────────────
+6.8.1 輸送主体【既定方針】
+(1) プレイヤー本人による直接運搬
+(2) プレイヤー所有の馬・荷馬・馬車・荷馬車による運搬
+(3) NPC運送業者による委託配送
+(4) プレイヤー運送業者への委託配送
+(5) 貸金庫間の配送サービス
+(6) 徒歩商隊、乗合車両への手荷物預託、河川船・帆船による共同輸送
+同じ荷物に複数区間の異なる輸送主体が関わり得る。ただし各区間の受渡を証明できること。
+
+6.8.2 発送単位と積荷の構造【設計案】
+Shipment（配送案件）1件にShipmentPackageを1個以上付け、貨物アイテムID／スタック数量を含める。
+Packageは実重量・体積・梱包後重量・外形・密封有無・壊れ物表示・温度条件・所有者・受取人・宣言価値を保持する。
+ShipmentLeg（輸送区間）単位に運送主体、路線、交通手段、車両、発着点、予定時刻、受渡責任者を記録。
+TrackingEventには確定した位置／通過地点／異常／時刻／証明イベントを保存する。
+配達状況の表示と、ワールド上の貨物実体の位置は矛盾させない。
+
+6.8.3 配送状態【設計案】
+DRAFT（見積・下書き）
+ → QUOTED（見積）
+ → ACCEPTED（契約成立・料金／積荷拘束）
+ → WAITING_PICKUP（集荷待ち）
+ → PICKED_UP（発送元受渡済み）
+ → IN_TRANSIT（輸送中）
+ → AT_HUB（配送拠点での一時保管）
+ → OUT_FOR_DELIVERY（配達区間）
+ → ARRIVED（受取場所に到着・受領待ち）
+ → DELIVERED（受取人へ引渡確定）
+ → CLOSED（代金・報酬・手数料精算終了）
+別経路：DELAYED、REROUTING、DAMAGED、PARTIALLY_LOST、LOST、STOLEN、DISPUTED、FAILED、CANCELLED、RETURNING、RETURNED、COMPENSATED。
+状態変更は正当な主体のみ許可。運送主体の自己申告だけでDELIVEREDにならない。
+
+6.8.4 依頼発行～受取の完全フロー【設計案】
+① 発送元・宛先の施設／受取人／品目／数量／納期／荷役条件を入力。
+② 現物の所有権、所在、違法性、保留中の取引、特殊貨物条件を検証。
+③ 梱包前後の重量・体積、路線候補、通行可否、交通手段、予定日数を算出。
+④ 運送料、税、梱包、保険、護衛、事故免責額、違約金、保証の見積を表示。
+⑤ 発送人が料金と貨物を予約。運送業者が受諾したら契約確定。
+⑥ 集荷時にシステムがitem_id集合と個数を照合し、custodianを運送業者へ変更。
+⑦ 出発、途中停車、乗換え、道路迂回、危険遭遇、検問等のイベントを処理。
+⑧ 到着拠点で現物照合。過不足・破損があれば例外経路へ。
+⑨ 受取人が受領操作。代理受領権限を検証し、item_locationを宛先へ確定。
+⑩ 預け契約の納品証拠を受けて、エスクローから運送料／護衛報酬を精算。
+⑪ 市場の売買に結びつく場合は別取引として販売処理し、地域在庫を増減させる。
+
+6.8.5 配送予約中の扱い【設計案】
+・発送手続中の品はRESERVED_FOR_SHIPMENTとなり、二重売却・別配送・装備・銀行引出を拒否。
+・予約期限まで集荷が行われなければ予約を解除。料金返却・取消手数料は契約に従う。
+・集荷完了後は荷主の所有権と運送業者の占有（保管責任）を別フィールドで管理する。
+・荷主の死亡・ログアウト・NPC移住は発送済み貨物の事実上の所在を変えず、相続・受取人変更契約へ派生。
+
+6.8.6 責任分界点と危険負担【設計案】
+・集荷前：発送人が現物保管責任を負う。
+・集荷の受領証明後：運送業者が契約上の管理責任を負う。ただし不可抗力等の免責は契約ごと。
+・他業者への積替え：区間ごとの受渡記録を作り、事故時の区間責任を追跡する。
+・宛先到着だけでは所有権移転としない。売買の所有権移転条件は取引契約が定める。
+・盗賊が貨物を奪取した場合、占有が盗賊へ変化しても法的所有権は自動移転しない。
+・盗難品が闇市場を経由した場合も来歴と盗難フラグを追跡できる設計にする。
+
+6.8.7 配送事故【設計案】
+種類：盗賊襲撃、モンスター襲撃、盗難、横領、橋破壊、落石、崖崩れ、事故、馬の病気、車輪破損、洪水、嵐、腐敗。
+事故発生時：正当性検証→被害品ID確定→占有／所在更新→証拠→遅延見通し→荷主通知→
+             護衛／調査／救助／回収クエスト候補→保険・補償・紛争判断→再配送／契約終了。
+輸送貨物が奪われても物理的に存在するならLOSTというラベルのみで消してはならない。
+所在不明をUNKNOWN_LAST_SEENにし、最後の確定所在と調査対象として管理する。
+
+6.8.8 保険と補償【設計案・要決定】
+・保険の適用には保険者の実在資金、契約締結時の条件、責任範囲、免責、限度額が必要。
+・保険料を支払った瞬間に不死身・無制限補償の貨物になる方式は採用しない。
+・補償金は保険準備金・運送保証金・裁定された賠償債務から支払い、無根拠に貨幣を生成しない。
+・補償後に現物が回収された場合は代位・返還・二重利得防止ルールを適用する。
+・プレイヤー業者が倒産・死亡・離脱した場合の履行保証・受取待ち・回収手続を別定義する。
+
+6.8.9 NPC運送業者の受注条件【設計案】
+運送業者は次を評価：積載余力、利益、道路治安、手持ち資金、馬車状態、納期、関係値、過去の失敗率、他契約の残り。
+契約金額が高くても危険が許容外なら拒否・追加護衛要求・高額見積・共同輸送を提案できる。
+評判悪化は受注減・料金上昇・銀行信用低下に連動してよいが、その強度は要決定。
+
+6.9 乗り物・交通・経路・事故の詳細
+────────────────────────────────────────────────────────────────────
+6.9.1 移動手段【既定方針】
+徒歩：追加費用小、道を選べるが低速・少量。
+乗馬：高速、馬の所有／賃借、疲労、飼料、地形の制約。
+荷馬：貨物向き。騎乗と運搬の同時利用条件に制約。
+乗合馬車：定期路線、手荷物容量、運行条件、他人との同乗。
+貸切馬車：自由度と引換えに運賃負担が大きい。
+荷馬車：大量貨物に適するが狭路や悪路に弱い。
+徒歩商隊：隊列と集団移動の安全性、宿泊、飲食、集団速度を管理。
+河川船・帆船：大量輸送向き。港、水深、風、天候、季節と航路に制限。
+
+6.9.2 乗り物の所有／賃貸【設計案】
+Vehicle：vehicle_id、owner_id、type、durability、speed、cargo_capacity、passenger_capacity、location。
+Animal：animal_id、owner_id、species、health、stamina、feed、temperament、skills、condition、location。
+RentalContract：貸主、借主、期間、出発・返却地点、賃料、保証金、状態、許可地域、被害賠償、禁止行為。
+借りた馬が死亡・失踪・盗難に遭った際は契約と証拠から責任を判断し、固定の無条件罰金とはしない。
+貸主が死亡した場合も契約は自動消滅せず、相続・組織移管・返却窓口へ接続する。
+
+6.9.3 乗合便と商隊【設計案】
+・RouteScheduleは便ID、出発地、目的地、中継点、発車条件、出発／到着予定、停留所、定員、運賃を持つ。
+・予約は座席だけでなく手荷物枠と預託貨物枠を別途確保する。
+・車内に共通言語・身分・組織の異なるNPCが乗ることで、会話と関係変化の機会が生じる。
+・旅客運賃／貨物運賃の取引は台帳を介して支払う。架空の乗車人数を受け付けない。
+・時間に遅れた乗客の扱いは、発車条件／キャンセルポリシー／NPCの優先順位とともに定義する。
+
+6.9.4 経路探索【設計案】
+RouteGraphを利用し、移動時間、通行料、距離、脅威、天候、車種適合、積載、輸送会社の許可地域で候補を列挙。
+商人NPCは「最短距離」以外に「最低費用」「期限確実」「危険低減」を選好可能にする。
+通行不能な橋・魔物の群れ・戦線が生じればルート再探索し、既存契約の納期変更／遅延証拠へ反映。
+距離が短くても河川渡航が無い道路は経路として採用しない。
+
+6.9.5 移動リスクとゲームプレイ【設計案】
+・狭路、泥道、雪道、河川増水、馬の疲労、夜間、暗所、山越えは速度や事故リスクに影響する。
+・車輪故障→鍛冶・修理職の需要、道路封鎖→迂回・護衛増、商隊遅延→食料・鉄不足→相場変化。
+・治安悪化→巡回警備の雇用、盗賊の活動増→情報拡散→依頼／通行量変化。
+・事故結果の生起確率は危険度×対策×交通状況の仮説として扱い、計算式はシミュレーションで調整。
+
+6.10 NPC自律商業・生活・情報伝播
+────────────────────────────────────────────────────────────────────
+6.10.1 NPCの経済行動【既定方針】
+NPCは生活・職務・資産・信用・知識・人間関係に基づき、買物、仕事、輸送発注、護衛契約、交渉、犯罪等を判断。
+NPC商人に全世界の現在価格を瞬時に与えず、現地観測、旅人、商業組合、手紙、噂からの遅延情報を与える。
+
+6.10.2 自律仕入れロジック【設計案】
+① 地元市場の欠品・価格高騰・予約注文を認知する。
+② NPC自身が知る仕入れ先の価格・在庫・最終観測時刻・信頼度を参照する。
+③ 荷物重量、輸送コスト、往復所要時間、売れ残り、護衛・税・道路・治安を見積もる。
+④ 資金・融資条件・評判・他の契約の拘束を考慮し、仕入れる／延期／代替／自社生産／断念を選ぶ。
+⑤ 必要なら銀行、運送業者、ギルドへの依頼候補を発行する。
+⑥ 受諾→代金／報酬原資拘束→輸送→納品→販売→利益確定→関係値更新を行う。
+
+6.10.3 意思決定の例【設計案】
+候補行動の効用 U = 期待純利益 + 生活／仕事適合 + 信頼補正 - 危険回避 - 時間拘束 - 疲労 - 契約違反リスク。
+数値係数はNPC特性別に仮設定し、プレイヤーに可視化する必要はない。選択結果の理由は内部ログで説明可能にする。
+NPCが資金を持たない場合、原資のない大規模発注や傭兵の無限雇用は禁止。
+
+6.10.4 NPC記憶・関係の反映【設計案】
+・同じ運送業者が毎回納期を守れば信頼が上がり、常連契約・取引先紹介を生じさせる。
+・馬車で繰り返し同席するNPCは顔見知りとなり、会話・商談・結婚・対立等のきっかけを得る。
+・輸送契約違反、詐欺、護衛放棄は関係悪化・噂・法的請求と連携。
+・NPC死亡・移住でも信用履歴と契約債務は制度に従い残る。完全リセットしない。
+
+6.10.5 情報と真実状態の分離【禁止条件】
+NPC Knowledge：本人が信じる価格、治安、到着予測、証言、噂。
+Authoritative State：実際の在庫、世界中の貨物所在、通貨残高、道路状態、事故・盗難の記録。
+知識が古いNPCが間違った行動を取ることは許容するが、会話モデルが真実台帳を勝手に上書きしてはならない。
+
+6.10.6 遠隔村のAIシミュレーション【既定方針＋設計案】
+LOD0：観測下の馬・荷馬車・乗客・貨物は近傍の位置と衝突を更新。
+LOD1：同村だが見えていない商隊・NPCは予定と重大イベントを周期更新。
+LOD2：遠隔村は村別収支・在庫・生産・輸送予定を集計し、配送案件を台帳として一意に進行。
+LOD移行時は原子的に保有区間・抽象移動進捗を変換。二重出現、テレポート、遅延の取り消しを防ぐ。
+
+6.11 地域経済・生産・需要・価格への波及
+────────────────────────────────────────────────────────────────────
+6.11.1 現物の保存と市場在庫【既定方針】
+・天然資源は採集と再生。完成した剣・鎧・家具・衣服・車輪等は素材と作業が必要。
+・製造品は製作者、製造地、投入資源、品質、耐久、来歴を保持し、市場で価値を持つ。
+・都市間配送は出荷元在庫を減らし、受取先在庫を増やす。輸送中は宙に浮いた市場在庫にしない。
+・ダンジョン内の死亡装備の回収と市場への売却は現物の移動であり、新規の人工物生成ではない。
+
+6.11.2 価格形成【既定方針】
+市場は村×品目ごとに現物在庫、買い・売り注文、生産能力、需要、購買力、税、物流費、代替品を持つ。
+注文成立を優先し、薄い市場では需給圧力と生産原価から参考価格を動かす。
+価格差が存在しても輸送費、死亡・盗難リスク、保険、納期、税、在庫限界のため無限裁定が成立しない。
+
+6.11.3 交易の採算式【設計案】
+期待交易利益＝販売収入（予測）－仕入原価－運送料－保険料－護衛費－税／関所料
+               －予測破損・喪失コスト－腐敗・保管料－資金拘束／時間機会費用。
+・需要が増えると高値売却の期待は高まるが、在庫の増加や競合輸入による下落も考慮。
+・実取引の成立は現物と通貨の交換によってのみ確定。
+・価格推定にLLMの自由文を直接計算値として使わない。
+
+6.11.4 都市の発展・衰退【既定方針】
+鉱山発展→鉄流通量増→鍛冶需要増→職人移住→馬車便増→道路整備・税収増という循環を許容する。
+橋破壊→荷物滞留→鉄価格上昇→城壁修復遅延→治安悪化→商人回避という負の連鎖も成立する。
+戦争や災害でも建築物や所有財産を一律リセットせず、修復と移住の履歴を残す。
+
+6.12 冒険者ギルド・クエスト・契約・護衛
+────────────────────────────────────────────────────────────────────
+6.12.1 派生する依頼【既定方針】
+・護衛：危険地域の商隊を安全に通過させる。
+・回収：盗難貨物・遺品・壊れた馬車の荷物を取り戻す。
+・調査：行方不明の隊商・破損した橋・犯罪の手掛かりを調べる。
+・修理：橋、道路、馬車、城壁、倉庫を必要な資材で復旧する。
+・補給：NPC都市の資材不足、軍の糧食、職人工房の素材を納品する。
+・救助：負傷者、孤立した商人、馬を安全地点へ移送する。
+
+6.12.2 護衛契約の原則【設計案】
+契約にはissuer、beneficiary、carrier、eligible_actors、route、cargo_manifest、deadline、reward_escrow、
+minimum_protection、proof_conditions、fail_conditions、payout_rules、dispute_jurisdictionを記録。
+荷主が報酬を用意できなければ契約成立不可。ギルドも自己の予算を超えて恒常的な護衛依頼を作れない。
+護衛者が口頭で「倒した」と述べるだけで成功にせず、実際の荷物到着・契約期限・事故ログを評価。
+
+6.12.3 受注資格【既定方針】
+公開、招待、単独、複数人、ギルド限定を用意。NPCとの信頼、称号、レベル・技能・犯罪歴、過去の配達実績等を参照。
+同じ護衛契約の定員超過を認めない。複数受注者への報酬分配は契約規則に依存する。
+
+6.12.4 状態遷移【既定方針】
+DRAFT → FUNDED → OPEN → ACCEPTED → IN_PROGRESS → SUBMITTED → SETTLED。
+例外：EXPIRED、CANCELLED、FAILED、DISPUTED、REFUNDED。
+・出発済みの商隊で募集人数不足となった場合、延期・一部履行・危険を受容して出発等を荷主AIが選択。
+・依頼主死亡は債務を勝手に破棄せず、組織／相続人／法制度に接続する。
+・期限変更は契約の改訂イベントと全当事者の権限確認が必要。
+
+6.12.5 物流とクエストの状態が衝突する場合【設計案】
+配送がDELIVEREDでも護衛が規定区間を不履行なら護衛報酬は自動満額とはしない。
+護衛が敵を全滅させても配達先に荷物が無ければ輸送契約の完了証明にはならない。
+輸送の危険は契約で免除されないが、護衛者が事故を避けたことは世界内の結果と評価する。
+
+6.13 犯罪・司法・窃盗・賠償・紛争
+────────────────────────────────────────────────────────────────────
+6.13.1 事件情報【既定方針】
+CrimeCase：行為者、被害者、対象item_id、所有者、発生地点、時刻、目撃者、証拠、被害額、管轄、捜査状態。
+NPCの目撃証言には誤認・伝聞が混ざり得る。権威サーバーの監査ログとNPCの主観を分ける。
+
+6.13.2 盗難・占有・法的所有権【設計案】
+法的所有者≠現物占有者の場合がある。盗賊が奪った品には元所有者・盗難事件・移転履歴を残す。
+盗難品を買った者の善意／悪意や返還請求、税関での没収などは司法制度の別途決定事項。
+銀行の保護領域は強盗による現物取り出し対象から除外する。ただし銀行外の輸送護衛は犯罪にさらされる。
+
+6.13.3 紛争・裁定【設計案】
+① 事故記録と契約内容の照合。
+② 受渡時の荷物ID、運送責任者、証拠、天候、検問・襲撃の情報を確定。
+③ 契約違反／不可抗力／第三者犯罪／虚偽申告／証拠不足を分類。
+④ 責任者に実在勘定からの賠償を請求。支払不能なら債務と法的処分状態を記録。
+⑤ 再配送、現物返還、代替品の生産、補償金支払い、異議申立を実施。
+⑥ ギルドの信用、NPC関係値、都市の治安、指名手配へイベントを伝播。
+
+6.13.4 PvP・初心者保護【既定方針＋要決定】
+・一人称の戦闘や略奪はサーバー権威で判定し、管轄・同意・セーフゾーン・通報規則に従う。
+・初心者の貸金庫を戦争で破壊して財産消滅させることは採用しない。
+・セーフゾーンの範囲、荷物窃盗の可能性、犯罪ペナルティ、取引禁止措置の範囲は要決定。
+
+6.14 死亡・遺品・ダンジョンとの統合
+────────────────────────────────────────────────────────────────────
+6.14.1 死亡に伴う資産移動【既定方針】
+死亡時：レベル2低下（下限あり）、携行金の一部喪失、携行アイテムの全喪失が基本。
+プレイヤー携行・装備している物理品は死亡処理の対象であり、貸金庫の確定保管品は一切含めない。
+金銭の喪失割合と最低レベルは要決定。死亡時の処理を単一の死亡イベントから追跡する。
+
+6.14.2 死亡品の再流通【既定方針】
+・死亡した場所の地面またはダンジョン資産プールへ同一item_idを移転。
+・宝箱は実際のプールに在庫がある品だけを予約できる。
+・モンスターが人間の剣を拾えば実際に装備し、性能を変化させる。討伐時には同じ剣が再び回収可能。
+・空の資産プールから完成剣を発生させることは禁止。
+・自然素材ドロップは素材の再生ルールとして扱い、完成品の生成根拠にしない。
+
+6.14.3 貨物と死亡の交差【設計案】
+ケースA：プレイヤー自身が担ぐ貨物→死亡処理の携行品となる。ただし別所有者の貨物は所有権を変えず占有のみ移る。
+ケースB：馬車に搭載済みの貨物→プレイヤーの死亡だけを理由に瞬間消滅しない。車両、荷台、周囲の戦闘・盗難へ連動。
+ケースC：NPC運送業者に引渡済み→依頼主が死亡しても出発・到着の実物進捗は継続。相続／契約処理が必要。
+ケースD：護衛者死亡→本人携行品は死亡ペナルティ。荷物の所有者・配送契約は維持し、護衛失敗等を判定。
+ケースE：輸送途上のNPC運送業者死亡→荷物を現実の所在へ移し、捜索・回収・損害請求へ分岐。
+
+6.14.4 新規開始から初回死亡までの導線【既定方針＋設計案】
+「無垢→村の小仕事→荷物運び→報酬→基礎職訓練→銀行預入→危険地帯への出発」を初期の短い循環とする。
+初心者には死亡時に携行品を失うこと、銀行内の品が保護されること、重要品は預けるべきことを明確に示す。
+無料の最低保管枠は推奨案。無料枠・初心者死亡保護の程度はプロダクトオーナー判断。
+
+6.15 中世ヨーロッパ相当の技術水準・魔法の境界
+────────────────────────────────────────────────────────────────────
+6.15.1 基本【既定方針】
+交通・工業・情報・商業・建築の基準は原則として中世ヨーロッパ相当の歴史的技術とする。
+ただし欧州中世は長期間・多地域にわたるため、ゲーム内の採用年代・地域イメージは要決定。
+魔法、モンスター、ダンジョン等のファンタジー要素は許容するが、経済・移動制約の無効化は個別審査。
+
+6.15.2 採用候補の分類【既定方針】
+建築：木造、石造、橋、城壁、城郭、倉庫、道路、宿屋、工房。
+生産：採鉱、精錬、鋳造、鍛冶、織物、皮革加工、陶工、木工、醸造。
+動力：人力、畜力、水車、風車。
+交通：徒歩、乗馬、荷馬、荷車、馬車、河川船、帆船、港湾。
+軍事：剣、槍、弓、弩、盾、鎧、攻城兵器。銃火器は未確定。
+農業：耕作、灌漑、製粉、畜産、備蓄、季節性農作物。
+商業：定期市、旅商人、商人組合、交易路、通行税、倉庫、商隊護衛。
+金融：硬貨、両替、保管、預り証、為替手形、担保・貸付、信用関係（細則要決定）。
+情報：手紙、掲示板、使者、宿屋の噂、旅人、伝令、組合の伝達網。
+医療：薬草、医療施設、包帯、簡易外科処置、治癒魔法（効果は要決定）。
+
+6.15.3 原則採用しない技術【設計案】
+・現代の車、鉄道、飛行機、コンテナ輸送、GPS、インターネット、無線ネットワーク。
+・現代的電子口座、世界銀行ネットワークによる無条件のリアルタイム決済。
+・大量生産の機械式銃火器・近代工業生産設備（銃の導入可否とは分けて決定）。
+・どこでも何でも同時入出庫できる超空間インベントリ。
+これらは魔法や世界独自技術としての例外を設定しない限り導入しない。
+
+6.15.4 魔法に関する判断軸【設計案】
+魔法の用途を「戦闘」「回復」「生産」「保存」「輸送」「情報」「金融」に分類し、各系統で許可範囲を設定。
+・収納魔法：重量／体積制約を破壊しやすいため、存在・容量・価格・普及率・希少性を要審査。
+・転移魔法：交易路と護衛クエストを無価値にし得るため、定点間・質量上限・対価・回数・危険の設計を要する。
+・保存魔法：腐敗品の輸送難度に影響。触媒・持続・費用・地域普及率を設定する。
+・遠隔通信魔法：相場情報の遅延という世界の情報非対称を崩すため、対象・距離・制限を設ける。
+・錬金／複製魔法：人工物と通貨の保存則に直接反するなら不可。生産として許可する場合は実材料と消費を定義。
+・召喚運送：運搬生物や魔法輸送も積載・所有権・事故・料金の共通基盤から免れない。
+※いずれの魔法も自動採用ではない。最終的な仕様承認の対象。
+
+6.15.5 世界観とゲーム内UIの関係【設計案】
+サーバー側の検索・監査・配達ステータスは利便性として現代技術を使ってよいが、
+ゲーム世界内では帳簿、通達、受領証、ギルド窓口、噂として表現することを原則とする。
+ユーザーがメニューで資産台帳を見られる場合も、NPCが同じ情報を即時知っているとは限らない。
+
+6.16 UI/UX・チュートリアル・アクセシビリティ
+────────────────────────────────────────────────────────────────────
+6.16.1 UIの画面構成【設計案】
+A. HUD：現在の重量／体積、負荷段階、スタミナ、危険、地元通貨・携行金、進行中の配送。
+B. インベントリ：重量と体積、容器、収納条件、装備、分割、移動、投棄、負荷予告。
+C. 貸金庫：預入／引出／別村配送／履歴／料金／残容量／施設状況。
+D. 銀行・金融：携行硬貨／保管硬貨／債権・手形／手数料／契約文書を別欄で表示。
+E. 配送見積：出発点・到着点、路線、所要時間、貨物重量体積、送料、護衛、保険、注意事項。
+F. 配送追跡：案件ID、現在の状態、最終確定地点、最終更新時刻、遅延理由、問い合わせ・紛争操作。
+G. 馬車予約：便、座席、料金、荷物、返却地、キャンセル、事故・遅延規約。
+H. 地域市場：相場とその更新日時、在庫、需要、輸送費、税、概算利益、情報源。
+I. 契約・ギルド：受注資格、原資、納品証拠、進捗、事故、補償、評価。
+
+6.16.2 誤解を招かない表示【設計案】
+・「銀行の保管品は安全」「輸送中の積荷は危険あり」を同一画面で明瞭に分ける。
+・配送中の『到着予想』と、権威サーバーで確定した『到着済み』を混同しない。
+・他村の相場情報は現在値ではなく『最後に聞いた相場』『調査日時』を添える。
+・積載超過時は重量・体積・収納条件のどれに引っかかったかを具体表示する。
+・料金に税・運賃・保険料・護衛費が含まれる／含まれないを分けて明記する。
+・失敗や通信切断時に未確定なのに『預けました』『配達しました』と表示しない。
+
+6.16.3 初心者導線【既定方針＋設計案】
+初期クエストは小荷物運搬→報酬受領→携行金を貸金庫へ預ける→重い品の扱い→初回遠征の危険説明の順を候補とする。
+全機能を一度に説明せず、最初の30～45分程度で預入・引出、重量・安全保管の価値を体験させる。
+貨物紛失や死亡時には「何が失われ、何が守られたか」を具体的なアイテムでフィードバック。
+
+6.16.4 アクセシビリティ【設計案】
+重量・容量は色分けだけでなく数字・文字・アイコンで表示。色覚特性や小画面を想定。
+数字の桁区切り、状態変化の読み上げ、キーボード・コントローラ操作、文字サイズ・簡易モードは要決定。
+契約や損害規約の要点は確認時に箇条書き表示し、重要な後戻り不能操作には確認を設ける。
+
+6.17 システム構成・サーバー権威・同期
+────────────────────────────────────────────────────────────────────
+6.17.1 アーキテクチャ方針【既定方針＋設計案】
+永続する資産・経済と、低遅延のプレイヤー移動・戦闘を分離する。
+小規模段階はモジュラーモノリス等で始めてもよいが、Ledgerを一意の権威として扱い、
+将来の村／リージョン分割を可能にする契約設計とする。サーバー製品・DB製品は未確定。
+
+6.17.2 コマンド確定手順【設計案】
+Client入力→Game Gateway認証／認可→権威サービスによる条件検証→対象資産ロック／version照合→
+台帳更新→同じDB取引内でOutboxイベント記録→COMMIT→結果通知→非同期の市場・NPC・クエスト処理。
+不正なクライアントの『成功した』申告は無視する。アイテム移動、残高、商隊出発はサーバーだけが確定。
+
+6.17.3 複数サービス間の整合【設計案】
+・銀行預入など単一DBの所在移転は同一取引で原子的に確定する。
+・村を跨ぐ長時間配送は分散した単一トランザクションで保持しない。配送契約・所在台帳を用いるSAGA等で進める。
+・メッセージ配信が少なくとも1回になることを前提に、処理側はevent_id・aggregate_versionで冪等化。
+・他村に到着した際は権威所有権の移譲と、配送受領の二重確定を防ぐ。
+・Outbox/Inboxと再処理ログによって障害時に最後の確定地点へ復帰できるようにする。
+
+6.17.4 NPC/物流LODと実貨物【設計案】
+遠隔村の物流は抽象的なエッジ移動をしてもよいが、同一区間上の便ID、貨物ID、積載量、出発・到着予定、事故履歴を持つ。
+観測範囲へ進入する場合は同じ便・貨物を実体化し、近傍シミュレーションへ変換する。
+非可視領域でNPCと馬車を省略描画しても、貨物の重複取得・架空納品・契約の逆行を発生させない。
+
+6.17.5 LLM失敗時【既定方針】
+・商人NPCの取引、配送スケジュール、通貨移転、銀行引出を止めず、決定的ルールで処理する。
+・交渉文生成が停止したら既定選択肢と定型テキストへフォールバック。
+・AIの提案する代金・数量・相手・移動予定が台帳・契約・知識範囲と整合しなければ拒否。
+
+6.18 データ設計（論理モデル・制約）
+────────────────────────────────────────────────────────────────────
+6.18.1 命名・採用範囲【設計案】
+以下は論理テーブル例。正式なDDL、インデックス、シャーディング方式、DB製品を確定したものではない。
+主キーは原則UUID相当、数値は通貨最小単位／重量・体積の整数最小単位を優先。
+すべての可変台帳にはversion、created_at、updated_at、correlation_id等の監査属性を追加検討する。
+
+6.18.2 コアテーブル（主なカラム）【設計案】
+[ACTOR]
+actors(actor_id PK, actor_type, home_region_id, status, account_ref)
+actor_reputation(actor_id, faction_id, trust_score, commerce_score, crime_score, updated_at)
+
+[WORLD]
+regions(region_id PK, nation_id, security, tax_policy_id, climate, local_time_model)
+settlements(settlement_id PK, region_id, settlement_type, population, production_profile,
+  treasury_account_id, security_rating, market_id)
+facilities(facility_id PK, settlement_id, facility_type, status, ownership_actor_id,
+  damage_state, operational_hours, capacity_policy_id)
+route_nodes(node_id PK, region_id, facility_id NULL, position, node_type)
+route_edges(edge_id PK, from_node_id, to_node_id, edge_type, distance, road_quality,
+  elevation_change, bridge_state, toll_id, security, weather_modifier, state_version)
+
+[ITEM / INVENTORY]
+item_types(type_id PK, mass_unit, volume_unit, dimensions, storage_tags,
+  transport_tags, stackable, perishable, manufacturable, recipe_ref)
+item_instances(item_id PK, type_id, quantity, quality, durability, creator_id, origin_event_id,
+  legal_owner_actor_id, custodian_actor_id, lifecycle_state, version)
+item_locations(item_id PK UNIQUE, location_type, location_id, container_slot, version)
+container_capacities(container_id PK, max_mass, max_volume, geometry_rule, storage_tags)
+item_provenance(event_id PK, item_id, event_type, predecessor_id, location, actor_id, occurred_at)
+※スタック分割のitem_id／quantity整合、位置の一意制約、所有権と占有の区別が必須。
+
+[VAULT]
+vaults(vault_id PK, facility_id, owner_actor_id, plan_id, status, capacity_version)
+vault_entries(vault_entry_id PK, vault_id, item_id UNIQUE, quantity, state, deposited_at,
+  reserved_shipment_id NULL, version)
+vault_authorizations(auth_id PK, vault_id, actor_id, permitted_actions, expires_at, issuer_id)
+vault_transactions(tx_id PK, vault_id, actor_id, action, request_id, status, committed_at)
+vault_fee_plans(plan_id PK, capacity_metric, included_amount, periodic_fee, extra_fee, revision)
+
+[FINANCE]
+currency_types(currency_id PK, denomination, metallic_mass, issuer, exchange_policy)
+accounts(account_id PK, actor_id, institution_id NULL, asset_type, currency_id, balance,
+  restricted_balance, status, version)
+ledger_transactions(tx_id PK, reason, request_id UNIQUE, source_event, status, occurred_at)
+ledger_entries(entry_id PK, tx_id, account_id, delta, asset_type, occurred_at)
+financial_instruments(instrument_id PK, instrument_type, issuer_actor_id, obligee_actor_id,
+  face_value, collateral_ref, currency_id, maturity_at, legal_state, transfer_rules)
+interbank_obligations(obligation_id PK, from_bank_id, to_bank_id, settlement_currency,
+  amount, due_at, status, backing_ref)
+※送金に関するbalance変更はLedger経由だけ。LedgerEntryの取引ごと資産タイプ別合計は0。
+  銀行預金の裏付け・現金保管の相違と発行制度は別勘定で表現する。
+
+[LOGISTICS]
+shipments(shipment_id PK, shipper_actor_id, consignee_actor_id, origin_id, destination_id,
+  contract_id, status, current_leg_id, fee_quote_id, cargo_owner_id, version)
+shipment_packages(package_id PK, shipment_id, measured_mass, measured_volume, dimensions,
+  packing_type, declared_value, condition_at_pickup, seal_id)
+shipment_cargo(package_id, item_id UNIQUE, quantity, reservation_status, custody_status)
+shipment_legs(leg_id PK, shipment_id, carrier_actor_id, vehicle_id NULL, from_node_id,
+  to_node_id, planned_departure_at, planned_arrival_at, departed_at, arrived_at, status)
+shipment_tracking(event_id PK, shipment_id, leg_id, node_id, event_type, observed_at,
+  recorder_actor_id, proof_ref, aggregate_version)
+shipment_incidents(incident_id PK, shipment_id, incident_type, affected_item_ids,
+  region_id, proof_ref, liability_status, claim_id NULL)
+shipping_quotes(quote_id PK, base_fee, cargo_fee, risk_fee, escort_fee, insurance_fee,
+  tolls, taxes, quoted_at, expires_at, price_policy_revision)
+
+[TRANSPORT]
+vehicles(vehicle_id PK, vehicle_type, owner_actor_id, status, cargo_capacity_mass,
+  cargo_capacity_volume, passenger_capacity, durability, location_node_id, version)
+animals(animal_id PK, animal_type, owner_actor_id, health, fatigue, feed_state,
+  load_capacity_mass, location_node_id, version)
+transport_services(service_id PK, operator_actor_id, route_id, schedule_id, tariff_id, status)
+transport_departures(departure_id PK, service_id, vehicle_id, planned_at, actual_at,
+  passenger_reserved, cargo_reserved, status, version)
+vehicle_rentals(rental_id PK, vehicle_or_animal_ref, lessor_id, lessee_id, start_at,
+  due_at, return_location, deposit_amount, liability_rules, status)
+
+[CONTRACT / JUSTICE]
+contracts(contract_id PK, contract_type, issuer_actor_id, provider_actor_id,
+  beneficiary_id, escrow_ref, reward_amount, deadline_at, evidence_requirements,
+  penalty_policy_id, status, version)
+contract_participants(contract_id, actor_id, role, eligibility_proof, accepted_at)
+escrow_hold(escrow_id PK, source_account_id, reserved_amount, release_rules, status)
+claims(claim_id PK, contract_id, incident_id, claimant_actor_id, respondent_actor_id,
+  claimed_value, compensated_value, status, jurisdiction_id, evidence_ref)
+crime_cases(case_id PK, event_id, actor_id, victim_id, item_id, location_id,
+  jurisdiction_id, witness_refs, investigation_status, judgement_ref)
+
+[EVENT / AUDIT]
+command_requests(request_id PK, actor_id, command_type, payload_hash, result_code,
+  result_ref, status, received_at, completed_at)
+world_events(event_id PK, event_type, aggregate_type, aggregate_id, aggregate_version,
+  causation_id, correlation_id, occurred_at, payload_version, payload_json)
+outbox_events(outbox_id PK, event_id UNIQUE, destination_topic, status, retry_count)
+inbox_consumption(consumer_id, event_id, consumed_at, result_hash, PRIMARY KEY(consumer_id,event_id))
+audit_reconciliations(run_id PK, period, checked_rows, issues_found, status, evidence_ref)
+
+6.18.3 参照整合と制約【設計案】
+D-01 item_locations.item_id はUNIQUE。資産は同時に複数所在地を持たない。
+D-02 vault_entries.item_idとshipment_cargo.item_idの排他はitem_locationsを権威として保証する。
+D-03 予約品はAVAILABLEとRESERVEDの双方として取引不可。
+D-04 同一shipment_id内のcargo行の質量・体積の合計＝Package集計。数量は保存される。
+D-05 item.legal_owner_actor_idとcustodian_actor_idは異なることを許す。
+D-06 accounts.balance－restricted_balance >= 0 等の資産別規則を取引境界で検証。
+D-07 ledger_entriesでtx_id単位に借方貸方が一致。特権発行勘定は必ず理由コードを持つ。
+D-08 成功したrequest_idを再送しても、同一結果を返し再度仕訳・移動しない。
+D-09 派生イベントのaggregate_versionが逆行しない。
+D-10 shipment到着は1回だけ確定し、受領で貨物所在が目的地に確定する。
+D-11 契約エスクロー支払総額は拘束額を超えない。
+D-12 遠隔村での集約更新も実際の個数・貨物ID・通貨に整合する。
+
+6.18.4 保存・削除・データ保護【要決定】
+監査ログの保存期間、NPCの会話記録の保管上限、個人情報取扱い、所有権台帳の長期保持、
+世界のスナップショット間隔、バックアップ保持期間、障害時のリストアRPO/RTOを別決定。
+物理削除で来歴や所有権の整合が断たれないよう、論理削除やアーカイブを設計する。
+
+6.19 API・イベント・状態遷移・擬似コード
+────────────────────────────────────────────────────────────────────
+6.19.1 コマンドインターフェース案【設計案：正式API未確定】
+POST /v1/commands/vault/deposit
+ body:{requestId, actorId, vaultId, itemIds, expectedInventoryVersion, expectedVaultVersion}
+POST /v1/commands/vault/withdraw
+ body:{requestId, actorId, vaultId, itemIds, targetContainerId, expectedVaultVersion}
+GET  /v1/vaults/{vaultId}/entries
+GET  /v1/vaults/{vaultId}/transactions
+POST /v1/commands/shipments/quote
+ body:{requestId, originId, destinationId, itemIds, deliveryPriority, insuranceOption}
+POST /v1/commands/shipments/create
+ body:{requestId, quoteId, carrierPreference, escrowAccountId, expectedInventoryVersion}
+POST /v1/commands/shipments/{shipmentId}/handover
+ body:{requestId, actorId, handoverPoint, proof, expectedShipmentVersion}
+POST /v1/commands/shipments/{shipmentId}/receive
+ body:{requestId, recipientId, acceptedPackageIds, proof, expectedShipmentVersion}
+GET  /v1/shipments/{shipmentId}
+GET  /v1/shipments/{shipmentId}/tracking
+POST /v1/commands/vehicle-rentals/create
+POST /v1/commands/vehicle-rentals/{rentalId}/return
+GET  /v1/regions/{regionId}/market
+POST /v1/commands/finance/transfer（銀行間決済機能の承認後のみ）
+POST /v1/commands/claims/create
+POST /v1/commands/claims/{claimId}/submit-evidence
+全POSTのrequestIdまたはIdempotency-Keyは必須。サーバー側で認証主体とactorIdの一致または委任を検証。
+
+6.19.2 レスポンス例【設計案】
+成功：{requestId, transactionId, resultVersion, status, committedAt, userMessage}
+保留：{requestId, operationId, status:"PENDING", retryAfter, committed:false}
+失敗：{requestId, status:"FAILED", errorCode, currentVersion?, userMessage}
+
+6.19.3 代表的なエラーコード【設計案】
+NOT_AUTHORIZED / ITEM_NOT_OWNED / ITEM_NOT_AVAILABLE / ITEM_RESERVED / VAULT_CLOSED /
+CAPACITY_EXCEEDED_MASS / CAPACITY_EXCEEDED_VOLUME / CONTAINER_INCOMPATIBLE /
+INSUFFICIENT_FUNDS / QUOTE_EXPIRED / NO_VALID_ROUTE / ROUTE_CLOSED /
+VEHICLE_CAPACITY_EXCEEDED / DEADLINE_EXPIRED / CARGO_MANIFEST_MISMATCH /
+VERSION_CONFLICT / DUPLICATE_REQUEST / PROOF_INVALID / CLAIM_NOT_ELIGIBLE /
+INSTRUMENT_UNBACKED / RATE_LIMITED / SERVICE_UNAVAILABLE / TRANSACTION_UNCERTAIN。
+※DUPLICATE_REQUESTは同内容の再試行成功を意味する場合もある。異なるpayloadで同一requestIdを使う場合は拒否。
+
+6.19.4 ドメインイベント【設計案】
+ITEM_RESERVED、ITEM_TRANSFERRED、ITEM_DESTROYED、ITEM_CRAFTED、VAULT_DEPOSITED、VAULT_WITHDRAWN、
+VAULT_OPERATION_INTERRUPTED、SHIPMENT_CREATED、CARGO_PICKED_UP、CARGO_HANDOVER_CONFIRMED、
+SHIPMENT_DEPARTED、SHIPMENT_DELAYED、SHIPMENT_REROUTED、SHIPMENT_ARRIVED、SHIPMENT_DELIVERED、
+SHIPMENT_STOLEN、SHIPMENT_DAMAGED、SHIPMENT_LOST、CLAIM_OPENED、CLAIM_SETTLED、
+ROAD_STATUS_CHANGED、VEHICLE_BROKEN、ANIMAL_DIED、NPC_TRADE_ORDER_CREATED、
+MARKET_STOCK_CHANGED、MARKET_PRICE_UPDATED、QUEST_OFFERED、QUEST_SETTLED、
+PLAYER_DIED、DUNGEON_ASSET_IN、DUNGEON_ASSET_OUT、LOAN_DEFAULTED、BANK_RECONCILED。
+共通メタデータ：eventId、aggregateId、aggregateVersion、occurredAt、causationId、correlationId、
+sourceService、actorId、payloadVersion、regionId。
+
+6.19.5 銀行預入の擬似コード【設計案】
+function deposit_to_vault(request):
+  verify_authenticated_actor(request.actorId)
+  verify_request_idempotency(request.requestId, request.payloadHash)
+  begin_transaction()
+  vault = lock_and_load_vault(request.vaultId)
+  assert vault.owner_or_delegate(request.actorId)
+  assert vault.facility_operational_for_deposit()
+  items = lock_items_in_stable_order(request.itemIds)
+  assert all_items_owned_by_actor(items, request.actorId)
+  assert all_items_currently_available_in_inventory(items, request.actorId)
+  assert all_items_pass_storage_rules(items, vault)
+  assert vault.has_capacity_for(items)
+  lock_and_charge_real_accounts_if_required(request.actorId, vault)
+  for item in items:
+      move_item_location_once(item, from=PLAYER_INVENTORY, to=IN_VAULT(vault.id))
+      write_vault_entry_and_history(item, vault.id)
+  write_outbox_event(VAULT_DEPOSITED, request.requestId)
+  store_request_result(request.requestId, SUCCESS)
+  commit_transaction()
+  return previously_or_newly_committed_result(request.requestId)
+
+6.19.6 配送の擬似コード【設計案】
+function create_shipment(request):
+  quote = verify_quote_exists_not_expired(request.quoteId)
+  items = lock_and_check_manifest(request.itemIds)
+  assert item_location_is_allowed_source(items)
+  assert no_item_already_reserved(items)
+  assert route_and_vehicle_support_quote(quote, items)
+  reserve_cargo_ids_atomically(items)
+  reserve_shipping_funds_and_escort_reward_if_required(request, quote)
+  shipment = persist_shipment(quote, items, status=ACCEPTED)
+  write_outbox_event(SHIPMENT_CREATED, shipment.id)
+  commit()
+  return shipment.id
+
+function confirm_delivery(shipmentId, proof, requestId):
+  begin_transaction()
+  shipment = lock_shipment(shipmentId)
+  assert shipment.status in {ARRIVED, OUT_FOR_DELIVERY}
+  assert valid_recipient_or_delegate(proof)
+  assert physical_cargo_ids_match_manifest(shipment, proof)
+  move_cargo_once_to_destination(shipment.cargo, shipment.destination)
+  mark_shipment_delivered_once(shipment)
+  write_outbox_event(SHIPMENT_DELIVERED, shipmentId)
+  store_request_result(requestId, SUCCESS)
+  commit_transaction()
+  //報酬の解放は配送成功イベントを契機に冪等な別処理とする
+
+6.19.7 商人NPCの仕入れ判断の擬似コード【設計案】
+function npc_choose_supply_action(npc, village, item_type):
+  need = estimate_local_demand_minus_stock(village, item_type)
+  if need <= threshold: return KEEP_STATUS_QUO
+  observations = npc.known_markets.filter_by_age_and_confidence()
+  candidates = evaluate_real_supplier_availability(observations)
+  for source in candidates:
+      cost = source.price + estimate_freight(source, village) + estimate_tax_and_risk(source)
+      profit = estimate_sale_revenue(village, need) - cost
+      if npc.free_funds < cost: consider_reduced_purchase_or_funded_credit()
+      score = profit + npc.relationship_trust(source) - npc.risk_aversion * estimate_risk(source)
+  return choose_feasible_action_or_defer()
+//実際の注文・契約・移動は各サービスで再検証・確定する。NPC推測値を真実値として扱わない。
+
+6.20 料金・リスク・需給・容量の暫定数理モデル
+────────────────────────────────────────────────────────────────────
+6.20.1 算定の原則
+以下は比較可能な仮説モデルであり、数値パラメータを決定した仕様ではない。
+ゲーム内通貨単位、速度、長さ、重量、時間単位をまず確定し、経済シミュレーションで係数を較正する。
+
+6.20.2 重量と積載
+M_total = Σ（item.mass × quantity）+ container.mass + equipment.mass
+V_used  = Σ packed_volume(item, quantity, orientation)
+r_mass  = M_total / M_capacity（M_capacity>0）
+r_vol   = V_used / V_capacity（V_capacity>0）
+r_load  = max(r_mass, r_vol)
+特別な長尺物は幾何判定が先。最大積載比率だけで収納できるとは限らない。
+
+6.20.3 運賃の構造
+FreightPrice = base_fee + distance_cost + mass_cost + volume_cost + labor_cost
+             + road_surcharge + danger_surcharge + priority_surcharge + tolls + taxes
+             + optional_escort + optional_insurance - consolidated_shipping_discount
+※各要素の二重計上を避け、キャッシュフロー上の受取先を定義。無料貨物の一律処理は不可。
+※需要増で値上がりするのは追加発注に対する見積。締結済み契約に遡及値上げしない。
+
+6.20.4 移動所要時間
+ETA = Σ(route_segment_distance / speed_by_vehicle_and_terrain)
+    + scheduled_wait + loading_unloading + rest_stop + inspection_wait + expected_weather_delay
+ゲーム時間倍率と実時間の表示を分離。事故が発生した場合は推定ETAを更新し、当初契約納期を改ざんしない。
+
+6.20.5 物流リスク
+RiskScore = f(route_threat, night, weather, cargo_value, vehicle_condition,
+              road_quality, escort_strength, carrier_skill, local_security)
+ExpectedLoss = Σ_i P(incident_i | route, protection) × Loss_i
+モデルが期待損失を算出しても、具体的事故は世界状態・確率選択・監査可能な乱数シードで実行する。
+危険度0の銀行内保管を経路リスク式へ混ぜない。
+
+6.20.6 利益と意思決定
+ExpectedTradeProfit = ExpectedSales - PurchaseCost - Freight - Tax - Escort - Insurance
+                    - Storage - ExpectedLoss - OpportunityCost
+実利益=約定済み売上－支払済み総費用－現実の損耗・補償。期待額と確定額を必ず区別。
+
+6.20.7 市場価格
+DesiredPrice = BaseProductionCost × ScarcityFactor × DemandFactor × LocalWealthFactor
+NewPrice = clamp(smooth(PreviousPrice, DesiredPrice), LocalFloor, LocalCeiling)
+※注文約定の価格を基本とし、この式は薄い市場・参考表示の候補。
+※係数・上限・下限は未承認。価格変化で同じitem_idを複製することは絶対にない。
+
+6.20.8 銀行・金融の資産整合
+Σ ledger_delta(tx_id, currency_id) = 0 （通常移転）
+PhysicalCoins_issued - PhysicalCoins_retired = PhysicalCoins_in_circulation + PhysicalCoins_in_vaults
+  + PhysicalCoins_in_transit + PhysicalCoins_other_authorized_locations
+預金請求権を物理硬貨数へ無条件加算しない。信用創造制度を導入する場合は別の明示規則が必要。
+
+6.21 異常系・障害復旧・不正防止・監査
+────────────────────────────────────────────────────────────────────
+6.21.1 共通例外と期待処理【設計案】
+E-01 預入と死亡が同時：同一item.versionを排他。成立した処理のみ有効。
+E-02 引出と配送申込が同時：片方だけ成功。両方で現物が増えない。
+E-03 同一荷物への配送依頼を二重送信：既存requestIdの結果を返す。
+E-04 出発後の契約取消：貨物を消さず、引返し／回送／履行継続の規定を適用。
+E-05 到着前に受領操作：拒否。利用者側の表示だけで配達完了にしない。
+E-06 貨物が盗まれた：物理所在・占有変更、法的所有者維持、事件記録・損害請求。
+E-07 銀行施設が閉鎖：保管安全性と台帳を維持し、引出待ち／代替施設フローへ。
+E-08 運送NPC死亡：契約・貨物を消さず、現物の所在と責任・派生依頼を維持。
+E-09 発送先が戦争で利用不能：代替拠点、迂回、保管待ち、差戻しを契約に従って選ぶ。
+E-10 橋が破壊：既存の航路進捗を維持して迂回、遅延予告、地域需給更新。
+E-11 車両が破損：出発停止または輸送中断、修理・牽引・代替便、費用責任。
+E-12 貸した馬が返らない：賃貸状態、期限、現在所在、違約・賠償の司法案件。
+E-13 不正な遠隔NPC提案：ルールエンジン拒否、再計画、必要なら理由ログ。
+E-14 口座残高不足：エスクロー、護衛・仕入れの発注を拒否。無資金の仕事を増殖させない。
+E-15 手形の二重譲渡：versionと請求権譲渡履歴で排他。支払を重複させない。
+E-16 通信応答が届かない：requestId照会で確定／未確定を確認し、勝手に成功扱いしない。
+E-17 DB部分障害：資産の移動を保留。部分的な残高変更や荷物移動を残さない。
+E-18 消費中素材で同時クラフト：ロック対象の投入品が二重消費されない。
+E-19 価格操作・大量発注：注文証拠と現物／信用制約から検知・制限。
+E-20 NPC証言と監査ログが不一致：主観の誤認と真実状態を分離し、司法手続きへ。
+
+6.21.2 不正対策【設計案】
+・パケットの価格、重量、残高、目的地、所有者、馬車速度を信頼しない。
+・出発地を偽造した配送、item_idの複製、マイナス質量、スタック分割丸めを拒否。
+・ダミー荷物で護衛報酬だけ受け取る自作自演を、実在貨物・実在資金・配達証拠で抑止。
+・多重アカウントの相互保険事故・相場操作・不自然なレア装備循環を監視する。
+・サーバーで決めた乱数イベント、死亡、資産移動はクライアント改竄で無効化できない。
+・管理者による資産補填／台帳修正は権限分離・監査・承認・理由コードを必須にする。
+
+6.21.3 障害からの復旧【設計案】
+・Outbox再配送、Inbox重複抑止、スナップショット、台帳リプレイを組み合わせる。
+・未確定コマンドは状態照会ができるまで確定通知を出さない。
+・施設／配送サービスの停止は世界内の故障と区別し、運営障害をプレイヤーの通常損失として転嫁しない。
+・再起動後には保管数、現物所在、配送中貨物ID、アカウント残高、エスクロー、契約を定期照合。
+・リカバリのRPO/RTO、監査期間、補填権限とSLAは設計レビューで決定する。
+
+6.21.4 可観測性【設計案】
+計測対象：資産照合エラー件数、二重所有検出数、負残高件数、配送状態滞留、ETA誤差、
+荷物紛失・盗難・賠償件数、貨物1件あたりの処理負荷、村別価格差、都市間交易量、
+初心者預入率・死亡後復帰率、NPC運送採算、銀行窓口の利用失敗率、取引確定待ち時間。
+個々のイベントでcorrelation_idを保持し、「村の不足→商人発注→護衛→事故→価格変化→賠償」を追跡可能にする。
+
+6.22 複合シナリオ（世界内の因果連鎖）
+────────────────────────────────────────────────────────────────────
+6.22.1 シナリオA：鉄不足から商隊護衛へ
+初期条件：冒険者都市Aでは剣製造用の鉄が不足。鉱山町Bでは供給余力あり。
+① Aの鍛冶師が鉄の高騰と工房の欠品を認知。
+② 商人NPCが情報源と鮮度を確認し、Bへの発注期待利益を計算。
+③ 商人が資産の範囲で鉄を購入。Bの在庫減少、商人の携行／倉庫現物に移る。
+④ 甲運送会社へ契約を発行。B→Aの道路が危険であるため、ギルドへ護衛募集。
+⑤ ギルドの報酬は商人の実在資金をエスクロー。適格プレイヤー1人以上が受注。
+⑥ Bで集荷、荷馬車にitem_idを積載。集荷した現物は銀行保管のままではない。
+⑦ 途中で盗賊が襲撃。護衛が守った場合、荷物のitem_id集合は不変。
+⑧ Aで実物到着、販売。A市場の鉄在庫増、鉄価格は段階的に反応。
+⑨ 護衛契約の履行証拠を確認し報酬支払。商人と護衛の信頼が上昇。
+⑩ Aの鍛冶師が鉄と労働から武器製造。製作者と来歴を記録。
+検証：鉄が出発地・輸送中・到着地に重複せず、金銭支払と現物変動が対応する。
+
+6.22.2 シナリオB：橋梁破壊から公共工事へ
+初期条件：A-B街道の橋が攻撃され、通行不能。
+① World ServiceがROAD_STATUS_CHANGEDを確定。行為者がいれば司法へ事件を発行。
+② 路線の通行可否が変化し、便が遅延／迂回。商隊への通知とETA更新。
+③ 食料輸送も遅れ、Aの食料欠品率・価格・住民の不満が変化。
+④ 村政が橋修繕の必要材料、作業時間、賃金、予算を見積もる。
+⑤ 資金をエスクローし、建築・資材配送・護衛の依頼をギルドに発行。
+⑥ 職人・運送業者・冒険者が仕事を受け、実際の素材と労働を消費して補修。
+⑦ 復旧後ROAD_STATUS_CHANGEDを発行、通常路線再開、配達時間短縮、輸送費下落。
+検証：資材・税収・工賃が保存則に従い、未復旧の橋を通過していない。
+
+6.22.3 シナリオC：初心者が死亡しても再出発できる
+① 無垢で開始したプレイヤーは小さな運送依頼を受ける。
+② 報酬硬貨の一部と重要装備を村の貸金庫へ安全に預ける。
+③ 遠征中にモンスターとの戦闘で死亡。携行品は死亡処理で地面／プールへ移る。
+④ レベル2低下（設定下限まで）、携行金の一部喪失。銀行内資産は不変。
+⑤ 復帰後、貸金庫へ行けば保存品を引出可能。道中で拾った品は無条件復元されない。
+⑥ 自身が失った現物IDを回収する遺品クエストを冒険者ギルドに出せる（発注原資の範囲内）。
+検証：死亡品ID集合、保管ID集合、残高とレベルの変動を照合。
+
+6.22.4 シナリオD：馬車の横領と犯罪調査
+① 荷主NPCがプレイヤー運送業者に高価な剣を預け、運送契約を締結。
+② 集荷後、剣の法的所有者は荷主のまま、占有者は運送業者となる。
+③ 運送業者が盗賊団へ横流しする。貨物IDは盗賊の現物所在へ移る。
+④ 契約は遅延／盗難・紛争状態になり、荷主は法的請求を作成。
+⑤ 目撃・輸送記録・取引証拠により捜査。NPCが誤認する可能性も保持。
+⑥ 盗賊が剣を装備して戦う場合、同じ剣の耐久・能力値を戦闘に反映。
+⑦ 奪還して被害者に返すか、判決に応じ賠償へ進む。
+検証：占有と法的所有権が別、二重アイテムなし、誤配達成功の自己申告は拒否。
+
+6.22.5 シナリオE：銀行停止と他村配送予約
+① プレイヤーが村Aで貸金庫に鎧を預け、別村Bへ配送を申し込む。
+② まだ集荷していない鎧はIN_VAULTであり、盗賊の略奪対象外。
+③ Aの貸金庫が襲撃され、施設がDAMAGEDとなる。資産IDと所有権は保護。
+④ 配送予約が保留となり、プレイヤーは復旧・代替施設の扱いを確認。
+⑤ 代替発送の正当な処理後、集荷確定と同時に鎧はIN_TRANSITへ移る。
+⑥ 道中の危険・事故は契約適用。無条件の保管安全性は輸送中には適用しない。
+⑦ Bに到着、受領確定、Bの預入へ移す場合は別の保管確定を行う。
+検証：A保管と輸送中とB保管のいずれにも鎧のIDが同時存在しない。
+
+6.22.6 シナリオF：遠隔地LODと商隊の実在性
+① 観測者のいない村BからAへ貨物が出発。Bの集約シミュレーションが便を進める。
+② 同じ時間に複数プレイヤーがA-B街道へ接近。
+③ LOD2→LOD0で商隊実体を展開する際、同一便ID・積載品IDを引き継ぐ。
+④ 片方が襲撃して貨物を盗もうとし、もう片方が護衛。戦闘の結果が物流台帳に反映。
+⑤ 遠隔集約更新と近接物理更新は同時に同一貨物を確定しない。
+⑥ 観測者が離れた後は積荷の状態を保存して再び集約へ戻す。
+検証：LOD境界で車両・NPC・荷物が複製されず、時間逆行も生じない。
+
+6.23 機能要件一覧（要求ID・優先度）
+────────────────────────────────────────────────────────────────────
+記法：ID｜優先度｜状態｜要求の概要｜主な依存領域
+優先度 Must／Should／Could は重要性であり、フェーズP0/P1/P2とは別。P0は実装基盤、P1は主要体験、P2は拡張。
+各要求の詳細条件は該当節を参照する。元第6章の識別子は意図を引き継ぎ、新規IDを補う。
+
+[保管：BANK]
+BANK-001｜Must｜既定方針｜中規模以上の村・都市に貸金庫を設置｜世界・施設
+BANK-002｜Must｜既定方針｜所持品・装備・通貨の預入／引出｜Inventory・Ledger
+BANK-003｜Must｜既定方針｜預入済み資産を死亡・襲撃・強盗・NPC犯罪から完全保護｜死亡・司法
+BANK-004｜Must｜既定方針｜保管資産の所有権・来歴・操作履歴を保存｜Ledger
+BANK-005｜Should｜設計案｜保管容量・料金プラン・無料枠を管理｜経済・UI
+BANK-006｜Must｜設計案｜二重引出・重複預入を原子的制御で防止｜DB
+BANK-007｜Must｜既定方針｜施設停止でも所有権を維持し復旧／代替取得を定義｜世界
+BANK-008｜Must｜設計案｜配送予約・引出・死亡との競合を一貫処理｜物流・死亡
+BANK-009｜Should｜設計案｜代理利用・ギルド共同保管の権限管理｜組織
+BANK-010｜Should｜設計案｜保管資産と通常倉庫・輸送待ち資産をUI上で区別｜UX
+
+[インベントリ：INV]
+INV-001｜Must｜既定方針｜全物理アイテムの重量・体積・収納条件を管理｜アイテム
+INV-002｜Must｜既定方針｜負荷に応じて移動・スタミナ・戦闘性能を変更｜戦闘
+INV-003｜Must｜既定方針｜搬送可能限界超の取得／積込みを禁止｜移動
+INV-004｜Must｜設計案｜収納具・長尺・形状・特殊品の適合性を判定｜クラフト
+INV-005｜Must｜設計案｜スタック分割・統合で数量・質量を保存｜DB
+INV-006｜Should｜設計案｜取得前予測、段階警告、対処方法を表示｜UX
+INV-007｜Must｜設計案｜馬・馬車・船の積載制約を同じ物理ルールへ接続｜交通
+INV-008｜Must｜既定方針｜非スタック品に一意ID・所在履歴・来歴を持たせる｜Ledger
+
+[物流：LOG]
+LOG-001｜Must｜既定方針｜村・都市間に実物の輸送配送を実装｜世界・経済
+LOG-002｜Must｜既定方針｜距離・重量・体積・治安・道路等で料金を算定｜経済
+LOG-003｜Must｜既定方針｜配送の進捗・位置・状態・荷物を追跡｜物流台帳
+LOG-004｜Must｜既定方針｜NPCが需要から自律的に配送を発注｜NPC・AI
+LOG-005｜Must｜既定方針｜配送・護衛・回収を冒険者ギルドへ連携｜クエスト
+LOG-006｜Should｜既定方針｜プレイヤー運送業者が委託を引き受ける｜マルチ
+LOG-007｜Must｜設計案｜配送予約・集荷・到着・受領における一意性を保証｜DB
+LOG-008｜Must｜設計案｜輸送中と安全保管中の区分を強制｜BANK
+LOG-009｜Must｜設計案｜道路破壊・事故・護衛不足による遅延・迂回を処理｜世界
+LOG-010｜Should｜設計案｜複数区間・拠点の積替えと責任分界を追跡｜司法
+LOG-011｜Should｜設計案｜荷物の盗難・破損・不着・調査・賠償を管理｜司法
+LOG-012｜Should｜設計案｜保険契約の原資、免責、支払額、代位を管理｜金融
+LOG-013｜Must｜設計案｜NPC商人の実在資産を超える仕入・配送注文を拒否｜経済
+LOG-014｜Must｜設計案｜市場の出荷元／入荷先在庫と実貨物を対応させる｜経済
+LOG-015｜Must｜設計案｜遠隔集約から近傍表示への切替で貨物IDを維持｜AI・LOD
+LOG-016｜Should｜設計案｜配達証拠により報酬エスクローを精算｜契約
+
+[交通：MOVE]
+MOVE-001｜Must｜既定方針｜徒歩・乗馬・乗合馬車・荷馬車を実装｜ワールド
+MOVE-002｜Must｜既定方針｜馬・馬車に体積と重量の積載制限｜物理
+MOVE-003｜Must｜既定方針｜道路状態を移動・物流費・所要時間に反映｜地理
+MOVE-004｜Should｜既定方針｜河川船・帆船の輸送を導入｜港湾
+MOVE-005｜Should｜設計案｜荷馬・貸切馬車・徒歩商隊を運営｜交通
+MOVE-006｜Should｜既定方針｜馬・馬車の所有・賃借・返却・賠償を管理｜契約
+MOVE-007｜Must｜設計案｜通行不能経路を拒否し、封鎖後に再経路探索｜地理
+MOVE-008｜Should｜設計案｜便のスケジュール、定員、乗客、荷物予約を管理｜NPC
+MOVE-009｜Should｜設計案｜馬・車両の損傷・疲労・補給・修理へ対応｜生産
+MOVE-010｜Could｜設計案｜移動を契機とするNPC交流・関係変化を深化｜NPC
+
+[金融：FIN]
+FIN-001｜Must｜既定方針｜携行現金と預入通貨を分離｜Ledger
+FIN-002｜Should｜既定方針｜銀行間の通貨決済方式を明文化｜金融
+FIN-003｜Could｜既定方針｜両替・融資・信用取引を導入｜金融
+FIN-004｜Must｜設計案｜通貨移転・税・報酬は複式仕訳で記録｜Ledger
+FIN-005｜Must｜設計案｜通貨発行・消滅を権限と理由コードで限定｜経済
+FIN-006｜Should｜設計案｜現金輸送と預り証／請求権の決済を区別｜物流
+FIN-007｜Should｜設計案｜銀行準備資金・信用限度・未決済債務を管理｜経済
+FIN-008｜Should｜設計案｜金融不正・二重請求・手形偽造の司法導線｜司法
+
+[自律社会：NPC/ECO/QUEST/LAW]
+NPC-601｜Must｜既定方針｜商人が需要、資金、知識の鮮度、危険を比較｜NPC
+NPC-602｜Must｜既定方針｜LLMが資産・契約・配送の真実状態を直接更新しない｜AI
+NPC-603｜Should｜設計案｜反復取引・同乗・事故で信用・関係を更新｜NPC
+NPC-604｜Must｜設計案｜NPC死亡・移住でも貨物、契約、債務を無条件に削除しない｜NPC
+ECO-601｜Must｜既定方針｜人工物は実素材と製造によってのみ誕生｜生産
+ECO-602｜Must｜既定方針｜地域別需給、輸送費、価格情報遅延を反映｜経済
+ECO-603｜Must｜既定方針｜ダンジョン資産プール・死亡品の現物再流通と整合｜死亡
+QUEST-601｜Must｜既定方針｜輸送依頼の報酬を現存資金から事前確保｜契約
+QUEST-602｜Must｜既定方針｜受注権・定員・期限・証拠・報酬精算を管理｜ギルド
+LAW-601｜Must｜既定方針｜盗難・契約不履行・賠償を司法と連携｜司法
+LAW-602｜Should｜設計案｜法的所有権と占有・保管責任を別管理｜Ledger
+
+[技術・UI・運用：TECH/UI/SYS]
+TECH-601｜Must｜既定方針｜生活・交通・建築は中世欧州相当の技術を基準｜世界観
+TECH-602｜Must｜既定方針｜魔法が重量・交通・経済制約を消す場合は個別ルールが必要｜魔法
+TECH-603｜Should｜設計案｜情報伝達の速度・距離・鮮度と相場知識を整合｜NPC
+TECH-604｜Must｜既定方針｜FPSは一人称戦闘。銃の有無は未決定｜戦闘
+UI-601｜Must｜設計案｜貸金庫の安全と輸送リスクを混同しない表示｜UI
+UI-602｜Must｜設計案｜積載理由・送料内訳・受領状態を行動前に明示｜UI
+UI-603｜Should｜設計案｜初期の運搬→預入→探索導線を実装｜チュートリアル
+SYS-601｜Must｜既定方針｜クライアント・LLMから独立したサーバー権威｜インフラ
+SYS-602｜Must｜既定方針｜資産移動に冪等性、排他、監査、再処理保証｜DB
+SYS-603｜Must｜設計案｜配送中の貨物を村分割やLODで二重実体化しない｜インフラ
+SYS-604｜Should｜設計案｜市場／物流／台帳のE2Eトレースと整合監査｜運用
+
+6.24 受入テスト・非機能テスト・不変条件テスト
+────────────────────────────────────────────────────────────────────
+テスト形式：ID｜対象｜準備／操作｜期待結果。合否閾値が必要な性能値は要決定とし、ゼロ増殖等の不変条件は厳格。
+
+[保管・安全]
+AC6-001｜BANK｜剣と硬貨を貸金庫へ預入し、プレイヤーを死亡させる｜預入品・預入硬貨は全量保護。
+AC6-002｜BANK｜貸金庫を設けた街へNPC盗賊と敵国兵を侵入させる｜預入資産が盗品化・消滅しない。
+AC6-003｜BANK｜貸金庫建物を被災・停止状態にする｜操作制限は起きてもVaultEntry・所有権は維持。
+AC6-004｜BANK｜同じ品を2端末で同時引出｜片方のみ成功、同一item_idを1件だけ取得。
+AC6-005｜BANK｜預入とプレイヤー死亡を同時実行｜片方の状態のみ確定、資産は複製されない。
+AC6-006｜BANK｜引出容量を超えた鞄を指定｜引出は失敗、預入品はそのまま。
+AC6-007｜BANK｜貸金庫から別村へ配送を予約し、集荷前に照会｜保管／予約状態であり輸送中にならない。
+AC6-008｜BANK｜集荷後に元の貸金庫で引出｜拒否し、貨物所在は輸送中で一意。
+AC6-009｜BANK｜通信切断後に預入命令を同じrequestIdで10回再送｜確定1回、履歴も重複課金なし。
+AC6-010｜BANK｜他人が委任無しで預入品を引出｜権限不足で拒否。
+
+[容量・移動・車両]
+AC6-011｜INV｜重量50%以下の荷物を持つ｜通常移動。
+AC6-012｜INV｜積載を50%超、75%超、100%超へ段階的に増加｜定義した速度・スタミナ・回避制限が適用。
+AC6-013｜INV｜125%を超える品を拾う｜取得不可、アイテムの現所在は不変。
+AC6-014｜INV｜重量上限内だが長尺品を小型鞄へ収納｜収納形状条件で拒否。
+AC6-015｜INV｜素材100単位を30/70に分割して統合｜数量・質量・体積の合計が保存。
+AC6-016｜MOVE｜荷馬に荷物を積む｜能力に応じプレイヤーから荷馬へ重量が移り、総量は増えない。
+AC6-017｜MOVE｜馬車に定員超の座席予約を並列実行｜定員以上の座席を販売しない。
+AC6-018｜MOVE｜橋を破壊して馬車を移動｜通行不可、迂回・遅延・断念を判定。
+AC6-019｜MOVE｜返却期限を過ぎた賃貸馬が事故で死亡｜契約状態・証拠・補償請求が整合。
+AC6-020｜MOVE｜船の容量を超える貨物を積込み｜出航前に拒否。
+
+[配送・保険]
+AC6-021｜LOG｜都市A→Bへ配送を申込｜荷物・料金・契約・追跡IDが一致。
+AC6-022｜LOG｜発送元の現物を集荷して輸送中にする｜A市場／保管場所から減り、B到着前はB在庫に加えない。
+AC6-023｜LOG｜到着前にB側から受領操作｜拒否、A/B双方にアイテムを作らない。
+AC6-024｜LOG｜複数便に跨がる貨物を積替え｜各区間の責任者と受渡証拠が追える。
+AC6-025｜LOG｜走行中に道路を封鎖する｜配送が遅延・再経路計算・通知に移行。
+AC6-026｜LOG｜盗賊が貨物を奪う｜所有権と占有が区別され、事件・回収・補償導線が発生。
+AC6-027｜LOG｜車両事故で積荷の一部を破損｜item_idを保持し耐久変化、補償範囲を照合。
+AC6-028｜LOG｜荷主が配送途中に死亡する｜現物・契約は消失せず制度に従う引継ぎ。
+AC6-029｜LOG｜同一配送の到着イベントを100回配送｜受取人の貨物・報酬は各1回のみ。
+AC6-030｜LOG｜発送・集荷後に取消する｜規則に従って戻し／継続し、荷物が消えない。
+AC6-031｜LOG｜事故発生後に保険契約を作成し遡及請求｜適用拒否。
+AC6-032｜LOG｜補償支払後に盗難品を回収する｜二重利得が生じない清算に移る。
+
+[NPC・経済・社会]
+AC6-033｜NPC｜Aで鉄不足、Bで鉄余剰、商人に資金を付与｜採算と情報に応じ調達候補が生じる。
+AC6-034｜NPC｜商人の所持金を0にする｜無資金の仕入・護衛契約を確定しない。
+AC6-035｜NPC｜遠隔地の相場が急変する｜未通知NPCが必ずしも新相場を知っていない。
+AC6-036｜NPC｜LLM停止中にNPCの配送契約を進める｜ルール処理で世界の流通は継続。
+AC6-037｜NPC｜同じ運送業者が期限遵守を反復する｜関係値・信用が整合的に変わる。
+AC6-038｜ECO｜大量の鉄がBからAへ入荷｜出荷元と入荷先の在庫・市場価格が条件に沿って変化。
+AC6-039｜ECO｜完成した剣の製造を要求し材料を0にする｜製造失敗、完成剣を生成しない。
+AC6-040｜ECO｜市場価格だけを2倍に変更する｜現物アイテム個数は増えない。
+AC6-041｜QUEST｜護衛依頼を発行し、報酬元の金を不足させる｜公開依頼の確定を拒否／適切に保留。
+AC6-042｜QUEST｜定員1の護衛依頼へ100人が同時応募｜受注確定は1人。
+AC6-043｜QUEST｜荷物が未到着なのに護衛者が任務完了を申告｜完了条件を満たさなければ報酬未確定。
+AC6-044｜LAW｜盗難運送貨物を闇市場へ売る｜来歴・法的所有権・占有・犯罪記録が連携。
+AC6-045｜LAW｜橋破壊後に修復を依頼｜資材・賃金・運送・工事の実在取引が生じる。
+
+[死亡・ダンジョン]
+AC6-046｜DEATH｜携行品と預入品がある状態で死亡｜携行品のみ喪失、保管品維持。
+AC6-047｜DEATH｜レベル1など下限付近で死亡｜定義下限を下回らない。
+AC6-048｜DUNGEON｜死亡装備がダンジョン資産プールに流入｜元item_idのまま記録。
+AC6-049｜DUNGEON｜空のプールから宝箱を補充｜完成人工物を無から出さない。
+AC6-050｜DUNGEON｜モンスターがプレイヤーの剣を拾う｜装備性能が変わり、討伐時に同じ剣が回収対象となる。
+
+[分散・同期・セキュリティ]
+AC6-051｜SYS｜遠隔商隊を近傍に展開し直後に集約へ戻す｜同一便・NPC・貨物に重複・瞬間移動なし。
+AC6-052｜SYS｜別サーバーへ貨物が跨る瞬間に障害を発生｜所在権威が片方だけに残る。
+AC6-053｜SYS｜Outboxイベントを重複・順不同配送｜契約、台帳、在庫が最終整合。
+AC6-054｜SYS｜クライアントが任意の重量、金額、移動速度を送る｜サーバーが検証し不正な値を拒否。
+AC6-055｜SYS｜同じitem_idへの売買・配送・死亡を同時実行｜最終状態は1か所かつ台帳整合。
+AC6-056｜SYS｜通信断後に処理結果を問い合わせる｜確定・失敗・保留の区別が可能。
+AC6-057｜SYS｜DB障害中に預入／出金する｜不正な部分移転が無く、未確定は成功扱いされない。
+AC6-058｜SYS｜アイテム・残高・配送・契約の全件照合｜検出対象の不整合がゼロ（試験用の破損は正しく検出）。
+AC6-059｜UI｜取得前に積載率を閾値超へする｜超過項目、原因、対処を理解できる。
+AC6-060｜UI｜配送見積から申込へ進む｜運賃・危険・保険・護衛・ETAを承認前に確認できる。
+AC6-061｜TECH｜銃火器を未承認の世界設定に出現させる｜仕様フラグで抑止。
+AC6-062｜TECH｜転移魔法を未承認で物流へ適用する｜資産移転は拒否される。
+
+6.24.1 性能・運用・品質指標【要決定】
+・NPC 10,000／村100の目標負荷時、配送・資産・NPC判断のイベント遅延分布（p50/p95/p99）。
+・1村あたりの在庫件数、商隊稼働便数、プレイヤー同時接続数、配送ピークTPS。
+・インベントリ操作、貸金庫預入・引出、見積の応答時間目標。
+・輸送ETA予測誤差、障害復旧RPO/RTO、データ照合周期、監査ログ保存期間。
+・無制限ログ蓄積や全NPCへの毎秒LLM呼出によるコスト破綻を防ぐ負荷制約。
+・性能予算は現時点では未確定であり、想定同時接続人数に基づく計測で決定する。
+
+6.24.2 コア受入ゲート【設計案】
+P0ゲート：資産ID一意性、残高保存、サーバー権威、死亡・預入競合、二重配送防止、イベント再実行が通る。
+P1ゲート：NPC需給→仕入→物流→市場反応→クエスト→報酬精算のE2Eが通る。
+P2ゲート：複雑な金融、保険、船舶、個人運送業者、魔法例外等を採用する場合の追加検証。
+※各ゲートの合否目標・担当者・リリース判定権限は別途承認。
+
+6.25 ロードマップ・段階実装・依存関係
+────────────────────────────────────────────────────────────────────
+6.25.1 P0（基盤必須／先行実装）【設計案】
+目的：資産保存則・安全保管・死亡・物理インベントリの破綻を防ぐ。
+① アイテム実体ID／所在地／来歴／所有権・占有の基礎。
+② Ledger、冪等コマンド、Outbox/Inbox、監査ツール。
+③ 重量・体積・コンテナ制約、徒歩移動への負荷反映。
+④ 貸金庫の預入・引出・安全保管・施設停止時のデータ保全。
+⑤ 運送契約・貨物予約・単一路線の配送状態、近距離貨物の受領。
+⑥ 死亡による携行品移転、ダンジョン資産プールとの連携。
+⑦ 必要最低限のUI、回帰テスト、事故・復旧テスト。
+
+6.25.2 P1（主要ゲーム体験）【設計案】
+目的：プレイヤーが金融・物流・冒険の相互依存を実感する。
+① 地域別市場・価格・在庫・NPC商人の需給認識。
+② 馬・荷馬・馬車・荷馬車・便／経路探索・道路損傷。
+③ NPCの輸送発注、ギルド護衛、報酬エスクロー。
+④ 遅延・盗難・修理・賠償の代表イベント。
+⑤ 商隊とNPC関係、商人の信用・会話の情報遅延。
+⑥ 物流追跡UI、地域相場・運賃比較、商人プレイの導線。
+⑦ LOD切替に伴う貨物同期の大規模試験。
+
+6.25.3 P2（拡張候補）【設計案】
+目的：社会・金融の深さと経済の表現力を高める。
+① プレイヤー運送業者の高度な信用・担保・事故保険。
+② 船舶、港湾、複数区間配送、倉庫業、国境を跨ぐ関税。
+③ 為替手形、銀行間決済、融資、担保、取付け、倒産制度。
+④ 保険組合、賠償訴訟、物権返還、融資回収、商人組合。
+⑤ 魔法と経済を横断した特例の採択・世界観拡張。
+⑥ 拡大したギルド戦争・派閥政治・国際物流。
+
+6.25.4 依存関係【設計案】
+Ledger＋ItemLocation → 貸金庫 → 安全な発送予約 → 配送状態 → 配達・市場反映
+WorldRoute＋Move＋Vehicle → 運送見積・移動可能性 → NPC発注 → 護衛依頼
+NPC Memory＋Knowledge → 情報遅延・信用評価 → 商人判断 → 商業関係の創発
+Quest＋Escrow＋Law → 護衛・賠償・事故 → 報酬・罰則の実行
+Death＋DungeonPool → 失われた装備の再流通 → 遺品回収・中古市場
+開発初期に全金融制度を導入せず、危険な実物輸送と安全保管の価値検証を優先する。
+
+6.26 未決定事項・意思決定優先順位
+────────────────────────────────────────────────────────────────────
+表記：高＝設計または実装着手前に要承認、中＝P1前に要承認、低＝P2検討時に決定可能。
+
+[世界／ルール]
+DEC-601【高】中規模村の閾値（人口、交易量、施設数、行政階層のどれを基準とするか）。
+DEC-602【高】開始時の保管施設配置、村間距離、地形／交通グラフの基準スケール。
+DEC-603【高】ゲーム内時間倍率、遠隔更新間隔、配送納期の実時間対応。
+DEC-604【中】土地・道路・橋の所有権、関所税、管轄の境界。
+
+[資産／保管]
+DEC-605【高】携行可能重量・体積、閾値、装備・筋力・技能補正、収納形状の細目。
+DEC-606【高】スタック素材の最小数量単位、容器階層、質量・体積の丸め方式。
+DEC-607【高】貸金庫の無料容量、保管手数料、超過・特殊保管料金と初心者救済。
+DEC-608【高】保管資産の代理引出・ギルド共有範囲、施設利用不可時の代替取得手続。
+DEC-609【中】生鮮・生物・危険品・盗難品・クエスト専用品の貸金庫預入可否。
+
+[物流／交通]
+DEC-610【高】受注、集荷、配送中、到着、受領の責任移転時点。
+DEC-611【高】紛失・破損時の責任区分、補償方式、免責、現物回収後の取扱い。
+DEC-612【高】運送料金・納期・危険のパラメータ、地理に応じた時間スケール。
+DEC-613【中】馬・馬車の販売・所有・賃借・返却、死亡・紛失と賠償。
+DEC-614【中】乗合馬車の路線固定／需要発車／時刻表、定員と荷物制限。
+DEC-615【中】商隊NPCの行動密度、同乗会話頻度、道中事故の生起頻度。
+DEC-616【中】プレイヤー運送業者がオフライン・死亡・逃亡した際の対応。
+DEC-617【低】河川船・帆船の積載、港湾、天候、国境越え制度。
+
+[金融／経済]
+DEC-618【高】硬貨の種類、換算単位、所持硬貨重量、国ごとの通貨差。
+DEC-619【高】預入通貨の実体と口座台帳、出金不能時の保障、発行・消滅権限。
+DEC-620【中】銀行間の物理送金／手形／純額清算の採用範囲、手数料、準備資産。
+DEC-621【低】利息、信用、貸付、担保、銀行取り付け、倒産／破綻処理。
+DEC-622【高】市場価格更新式・上限・下限・買占め防止、貨物到着時の在庫計上。
+DEC-623【中】貯蔵／運送／盗難品の課税、違法商業の受入範囲。
+
+[戦闘／技術／魔法]
+DEC-624【高】初期設定の中世欧州の参照年代・地域、銃火器導入可否。
+DEC-625【高】魔法による転移、収納、現物複製、情報伝達、腐敗防止の可否。
+DEC-626【高】死亡時の携行金喪失割合、レベル下限、遺品残存期間、回収権。
+DEC-627【中】PvP・盗難・初心者保護・セーフゾーンと司法ルール。
+
+[エンジニアリング／運用]
+DEC-628【高】サーバーの村境界、同時接続想定、権威移譲、DB構成、ロック方式。
+DEC-629【高】配送事故や通信障害時の確定点・リトライ／補償プロトコル。
+DEC-630【高】正式API、DDL、イベントスキーマ、認証・認可、監査権限。
+DEC-631【中】LOD各段階の更新頻度と描画復帰時の貨物再現方式。
+DEC-632【中】負荷目標、RPO/RTO、バックアップ間隔、イベントログ保存期間。
+DEC-633【中】管理者による資産補填の承認フローとユーザーサポート手順。
+DEC-634【中】画面別UI、音声・文字・操作機器のアクセシビリティ方針。
+
+6.26.1 承認順序の推奨【設計案】
+第1群（最優先）：DEC-605、606、610、618、619、626、628～630。
+  理由：台帳・死亡・発送・積載のデータ構造と整合性がこの群で決まるため。
+第2群（世界・UX）：DEC-601～604、607～609、612、622、624、625。
+  理由：施設配置、初心者導線、経済と世界観の制約が決まるため。
+第3群（拡張）：DEC-611、613～617、620、621、623、627、631～634。
+  理由：補償深度、複雑な金融・交通、運用水準をゲームバランス・予算を踏まえて選択できるため。
+※補償（DEC-611）は本格的な危険輸送を公開する前には「高」水準で確定すること。
+
+6.27 出典対応・変更点・整合性チェック
+────────────────────────────────────────────────────────────────────
+6.27.1 改訂時に参照した資料
+SRC-01 添付：新規 テキスト ドキュメント.txt
+       「第6章 金融・保管・物流・交通システム」原文（6.1～6.11）。
+SRC-02 LIVING_WORLD_開発者向け詳細要件定義書.pdf
+       全体機能マップ、世界・ジョブ・NPC・AI・クエスト、死亡、経済、金融、物流、司法、UI。
+SRC-03 LIVING_WORLD_統合詳細設計書_全16領域.pdf
+       アーキテクチャ、台帳・イベント、NPC、経済、職業、契約、死亡、物流、司法。
+SRC-04 01_企画書_事業計画_ゲームデザイン.pdf
+       世界観、無垢からの初期体験、商人・職人・冒険者・社会的プレイの方向性。
+SRC-05 03_プログラマー向け_実装設計書.pdf
+       アイテム一意性、複式台帳、同期、LOD、イベント、死亡・銀行・配送の実装方針。
+SRC-06 04_NPC_AI_経済_専門設計書.pdf
+       NPC自律判断、情報遅延、人工物保存、金融・物流・市場・司法の因果連鎖。
+
+6.27.2 元第6章から維持した事項
+・貸金庫を中規模以上の村・都市へ配置し、預入品を死亡・戦争・強盗から保護。
+・重量・体積の二重制約と、暫定の5段階の過積載制限。
+・自力運搬、馬・馬車、NPC／プレイヤー運送業者、貸金庫間配送。
+・輸送距離、危険度、道路、荷役、護衛、優先度による運賃算定。
+・輸送の途中経過、事故、盗難、賠償と物流から冒険依頼への連携。
+・徒歩、乗馬、荷馬、乗合／貸切馬車、荷馬車、商隊、船舶の交通候補。
+・中世相当技術と貨幣中心の世界観、手形・信用取引は拡張可能。
+・元第6章のBANK/INV/LOG/MOVE/FIN要件の全分類と主要受入テスト。
+
+6.27.3 今回追加・補強した事項
+・第1～5章の世界／職業／NPC／AI／クエストの方針を第6章の前提条件として明記。
+・死亡時レベル2低下、携行品全喪失、ダンジョン資産プール、人工物保存則との明確な統合。
+・所有権、現物占有、保管責任、契約上の危険負担の4概念を分離。
+・預入、発送予約、輸送中、受領の排他境界と二重引出・死亡競合の処理を具体化。
+・帳簿、口座、預り証、現物硬貨、銀行間決済の相違と中世世界観への整合。
+・商人NPCの情報遅延・信用・資力、遠隔村のLODと物流の実在性を規定。
+・サーバー権威、論理データモデル、API、イベント、擬似コード、異常系、監査、性能・受入テスト。
+・自然発生の物流クエスト、補修・賠償・価格・社会関係のE2E連鎖。
+・設計案と未決定事項の明確化、段階実装の依存関係。
+
+6.27.4 既存資料との注意すべき区別
+・『第1～5章』は開発者向け詳細要件定義書の世界・キャラクター・NPC・AI・クエスト相当を主に参照。
+  異なる資料では章番号が異なるため、他文書での「第6章」「第8章」等の番号をそのまま本書の番号とみなさない。
+・「全アイテム喪失」は死亡時にプレイヤーが携行／装備中のものが対象。確定済み貸金庫保管資産は対象外。
+・「預入資産の完全保護」は金庫内の確定保管状態が対象。集荷済みの貨物を安全とみなさない。
+・「NPCの自律思考」は常時LLM呼び出しを意味しない。ルール・効用・状態機械を優先する。
+・「100村、10,000 NPC」は達成保証やリリース必須値ではない。
+・「FPS」は一人称視点の意。銃火器の採用は未決定。
+・中世欧州技術、魔法例外、貸金庫の料金、事故補償率、金融の貸付方式はいずれも具体値未承認。
+・銀行や貨物サービスの障害によるデータ喪失を、ゲーム世界の強盗イベントとして正当化しない。
+
+6.27.5 レビュー時のチェックリスト
+[ ] 既定方針と設計案を混同していないか。
+[ ] 所有者、占有者、契約責任者、預かり先の区別がデータモデルにあるか。
+[ ] 同一item_idの複製・消滅に監査可能な根拠があるか。
+[ ] 保管中は絶対保護し、輸送中は危険にさらされる境界が明確か。
+[ ] 貸金庫の入出庫・死亡・発送・受領の競合がテストされているか。
+[ ] 人工物製造の素材・設備・時間・来歴を検証しているか。
+[ ] 通貨・報酬・税・保険の支払原資が明示されているか。
+[ ] NPCが知らない地域情報を不自然に利用していないか。
+[ ] LLMの出力で資産や契約が直接確定しないか。
+[ ] 未観測村の集約更新が可視化時に実物と整合するか。
+[ ] 物流事故の結果が市場・ギルド・司法・NPC関係へ波及するか。
+[ ] 異常系・操作再送・障害復旧が成功扱いの重複を起こさないか。
+[ ] 中世技術と魔法例外が経済制約を壊していないか。
+[ ] 未決定事項の責任者と承認日を別の決定ログで管理するか。
+
+────────────────────────────────────────────────────────────────────
+文書末尾／Ver.1.0
+────────────────────────────────────────────────────────────────────
+本書は、既定方針を保持しながら、未記載の結合部分を具体的な仕様「案」として補完したもの。
+実装開始前に、特に保管・死亡・発送の境界、通貨台帳、容量、金融制度、魔法例外の承認を実施すること。

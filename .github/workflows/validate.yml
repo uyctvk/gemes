@@ -1,0 +1,37 @@
+name: Native game validation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      build:
+        description: Build Windows and Linux archives
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install verified Godot 4.6.3
+        run: python3 scripts/setup.py
+      - name: Import, domain tests and scene smoke
+        run: bash scripts/check.sh
+      - name: Build PC packages
+        if: github.event_name == 'workflow_dispatch' && inputs.build
+        run: |
+          python3 scripts/setup.py --exports
+          bash scripts/build.sh
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch' && inputs.build
+        with:
+          name: LivingWorld-0.1.0-PC
+          path: |
+            build/*.zip
+            build/SHA256SUMS.txt
