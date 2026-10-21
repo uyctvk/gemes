@@ -31,7 +31,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'workflow_dispatch' && inputs.build
         with:
-          name: LivingWorld-0.2.0-PC
+          name: LivingWorld-PC
           path: |
             build/*.zip
             build/SHA256SUMS.txt

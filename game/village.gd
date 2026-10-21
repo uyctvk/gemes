@@ -1,14 +1,27 @@
 extends Node3D
-## A small, handcrafted procedural greybox. No downloaded art dependencies.
+## Blender-authored Elm village, with simple collision volumes independent of art.
 const Catalog = preload("res://game/core/catalog.gd")
+const CharacterAnimation = preload("res://game/character_animation.gd")
 const FARMER = preload("res://game/assets/characters/farmer.glb")
 const MERCHANT = preload("res://game/assets/characters/merchant.glb")
 const HEALER = preload("res://game/assets/characters/healer.glb")
 const GUARD = preload("res://game/assets/characters/guard.glb")
+const COTTAGE = preload("res://game/assets/village/cottage.glb")
+const WORKSHOP = preload("res://game/assets/village/workshop.glb")
+const TOWNHOUSE = preload("res://game/assets/village/townhouse.glb")
+const MARKET = preload("res://game/assets/village/market_stall.glb")
+const WELL = preload("res://game/assets/village/well.glb")
+const BARREL = preload("res://game/assets/village/barrel.glb")
+const CART = preload("res://game/assets/village/handcart.glb")
+const OAK = preload("res://game/assets/village/oak.glb")
+const CRATE = preload("res://game/assets/village/crate.glb")
 var targets: Array = []
 var villagers: Array = []
 var skeletons: Array = []
-var base_rotations: Dictionary = {}
+var character_animations: Array = []
+var guardian_animation: RefCounted
+var last_update_time := 0.0
+var last_enemy_attack := 0.0
 var guardian: Node3D
 var guardian_skeleton: Skeleton3D
 var gate: Node3D
@@ -33,10 +46,15 @@ func build(ui_font: Font) -> void:
 		add_child(person)
 		villagers.append(person)
 		skeletons.append(person.find_children("*", "Skeleton3D", true, false).front())
+		var animation = CharacterAnimation.new()
+		animation.setup(person)
+		character_animations.append(animation)
 	guardian = _person("guard", 1.12)
 	add_child(guardian)
 	guardian_skeleton = guardian.find_children("*", "Skeleton3D", true, false).front()
 	guardian.position = Vector3(0, 0, -43)
+	guardian_animation = CharacterAnimation.new()
+	guardian_animation.setup(guardian)
 
 func material(color: Color, emission: bool = false) -> StandardMaterial3D:
 	var key = color.to_html() + str(emission)
@@ -85,9 +103,9 @@ func _make_environment() -> void:
 	var env := WorldEnvironment.new()
 	var sky := Sky.new()
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color("526f82")
-	sky_mat.sky_horizon_color = Color("849793")
-	sky_mat.ground_horizon_color = Color("879080")
+	sky_mat.sky_top_color = Color("6592ad")
+	sky_mat.sky_horizon_color = Color("bed0ce")
+	sky_mat.ground_horizon_color = Color("8e9c7e")
 	sky_mat.ground_bottom_color = Color("4b625a")
 	sky.sky_material = sky_mat
 	var environment := Environment.new()
@@ -95,7 +113,7 @@ func _make_environment() -> void:
 	environment.sky = sky
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.ambient_light_color = Color("91aaa3")
-	environment.ambient_light_energy = 0.22
+	environment.ambient_light_energy = 0.45
 	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	environment.fog_enabled = true
 	environment.fog_light_color = Color("86938a")
@@ -105,95 +123,97 @@ func _make_environment() -> void:
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-38, -32, 0)
 	sun.light_color = Color("f5d6aa")
-	sun.light_energy = 0.55
+	sun.light_energy = 0.72
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 90
 	add_child(sun)
 
+func _asset(scene: PackedScene, pos: Vector3, angle: float = 0.0, scale_factor: float = 1.0, parent: Node3D = null) -> Node3D:
+	var model := scene.instantiate() as Node3D
+	model.position = pos
+	model.rotation.y = angle
+	model.scale = Vector3.ONE * scale_factor
+	(parent if parent != null else self).add_child(model)
+	return model
+
+func _solid(parent: Node3D, pos: Vector3, size: Vector3) -> void:
+	var body := StaticBody3D.new()
+	body.position = pos
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	collision.shape = shape
+	body.add_child(collision)
+	parent.add_child(body)
+
+func _ground_material(kind: String, repeats: float) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = load("res://game/assets/village/" + kind + "_albedo.png")
+	mat.normal_enabled = true
+	mat.normal_texture = load("res://game/assets/village/" + kind + "_normal.png")
+	mat.normal_scale = 0.65
+	mat.roughness = 0.95
+	mat.uv1_triplanar = true
+	mat.uv1_scale = Vector3.ONE * repeats
+	return mat
+
 func _ground() -> void:
-	box(self, Vector3(0, -0.55, -15), Vector3(180, 1, 180), Color("354d35"), true)
-	box(self, Vector3(0, -0.025, -14), Vector3(5.8, 0.08, 90), Color("4e473d"))
-	box(self, Vector3(0, 0.01, -2), Vector3(28, 0.07, 4.5), Color("544c3d"))
-	cylinder(self, Vector3(0, 0.02, 2), 7.6, 7.6, 0.1, Color("554f42"), 24)
-	# Irregular flagstones make the travelled route read as a road from shoulder height.
-	for z in range(-36, 29, 2):
-		for side in [-1, 0, 1]:
-			var shift = rng.randf_range(-0.18, 0.18)
-			box(self, Vector3(side * 1.72 + shift, 0.045, z + rng.randf_range(-.2, .2)),
-				Vector3(1.52, .05, 1.55), Color("716653") if (z+side)%4 else Color("57534a"))
-	# A low stone well at the centre, with a passable plaza around it.
-	cylinder(self, Vector3(0, 0.45, 1), 1.2, 1.2, 0.9, Color("81887d"), 10)
-	cylinder(self, Vector3(0, 0.92, 1), 0.9, 0.9, 0.05, Color("34585c"), 10)
-	for x in [-1.25, 1.25]: box(self, Vector3(x, 1.6, 1), Vector3(0.18, 3.0, 0.18), Color("574b3a"), true)
-	box(self, Vector3(0, 3.05, 1), Vector3(2.8, 0.2, 0.3), Color("574b3a"))
-	# Soft silhouettes enclose the playable area without external terrain assets.
+	var grass := box(self, Vector3(0, -0.55, -15), Vector3(180, 1, 180), Color.WHITE, true)
+	grass.material_override = _ground_material("grass_ground", 0.7)
+	var road_material := _ground_material("cobble_ground", 0.7)
+	var road := box(self, Vector3(0, -0.085, -14), Vector3(5.8, 0.08, 90), Color.WHITE)
+	road.material_override = road_material
+	var crossing := box(self, Vector3(0, -0.08, -2), Vector3(28, 0.07, 4.5), Color.WHITE)
+	crossing.material_override = road_material
+	var plaza := cylinder(self, Vector3(0, -0.095, 2), 7.6, 7.6, 0.1, Color.WHITE, 48)
+	plaza.material_override = road_material
+	for z in range(-21, 29):
+		for side in [-1, 1]:
+			if z > -5 and z < 9: continue
+			box(self, Vector3(side * 3.0, 0.06, z), Vector3(0.25, 0.16, 0.9), Color("646b5c"))
+	_asset(WELL, Vector3(0, 0, 1))
+	_solid(self, Vector3(0, 0.52, 1), Vector3(2.15, 1.04, 2.15))
+	for x in [-1.24, 1.24]: _solid(self, Vector3(x, 1.5, 1), Vector3(.18, 3, .2))
 	for i in range(18):
 		var angle = i * TAU / 18.0
 		var hill := SphereMesh.new()
 		hill.radius = rng.randf_range(14, 23)
 		hill.height = hill.radius * 1.3
-		hill.radial_segments = 10
-		hill.rings = 5
-		_mesh(self, hill, Vector3(sin(angle)*75, -2, cos(angle)*65 - 20), Color("73816c"))
-	for x in [-43, 43]: box(self, Vector3(x, 2, -10), Vector3(1, 5, 110), Color("6b7560"), true)
-	for z in [-62, 35]: box(self, Vector3(0, 2, z), Vector3(86, 5, 1), Color("6b7560"), true)
+		hill.radial_segments = 24
+		hill.rings = 12
+		_mesh(self, hill, Vector3(sin(angle)*75, -2, cos(angle)*65 - 20), Color("64755a"))
+	for x in [-43, 43]: _solid(self, Vector3(x, 2, -10), Vector3(1, 5, 110))
+	for z in [-62, 35]: _solid(self, Vector3(0, 2, z), Vector3(86, 5, 1))
 
-func _building(pos: Vector3, size: Vector3, roof_color: Color) -> void:
-	var house := Node3D.new()
-	house.position = pos
-	add_child(house)
-	box(house, Vector3(0, size.y/2, 0), size, Color("a99a7b"), true)
-	box(house, Vector3(0, 0.25, 0), Vector3(size.x + 0.15, 0.5, size.z + 0.15), Color("87877a"))
-	for x in [-size.x/2, 0, size.x/2]:
-		box(house, Vector3(x, size.y/2, size.z/2 + 0.03), Vector3(0.15, size.y, 0.12), Color("574d3d"))
-	for y in [1.0, size.y - 0.15]:
-		box(house, Vector3(0, y, size.z/2 + 0.05), Vector3(size.x, 0.12, 0.14), Color("574d3d"))
-	for side in [-1, 1]:
-		var roof = box(house, Vector3(side * size.x/4, size.y + 0.8, 0), Vector3(size.x * 0.66, 0.18, size.z + 1), roof_color)
-		roof.rotation.z = side * deg_to_rad(32)
-		for stripe in range(5):
-			var z_tile = -size.z / 2 + stripe * size.z / 4
-			var tile = box(house, Vector3(side * size.x/4, size.y + .84, z_tile), Vector3(size.x*.66, .055, .06), roof_color.darkened(.2))
-			tile.rotation.z = side * deg_to_rad(32)
-		for brace in [-1, 1]:
-			var timber = box(house, Vector3(side * size.x*.32, size.y*.56, brace*size.z*.36), Vector3(.08, size.y*.50, .08), Color("4f4538"))
-			timber.rotation.z = side * .33
-	for x in [-size.x/3, size.x/3]:
-		var window = box(house, Vector3(x, 1.9, size.z/2 + 0.09), Vector3(0.75, 0.9, 0.07), Color("edbd6e"))
-		window.material_override = material(Color("e4ba77"), true)
-		box(house, Vector3(x, 1.9, size.z/2 + 0.15), Vector3(0.07, 0.95, 0.07), Color("66543f"))
-		for side in [-1, 1]:
-			box(house, Vector3(x + side*.46, 1.9, size.z/2 + .15), Vector3(.2, .94, .08), Color("56523d"))
-		box(house, Vector3(x, 1.35, size.z/2 + .2), Vector3(1.05, .13, .24), Color("827661"))
-	box(house, Vector3(0, 0.95, size.z/2 + 0.08), Vector3(0.95, 1.9, 0.08), Color("65523e"))
-	box(house, Vector3(0, 1.0, size.z/2 + .15), Vector3(.11, 1.65, .08), Color("9b7e55"))
-	var knob = cylinder(house, Vector3(.31, .9, size.z/2 + .2), .055, .055, .08, Color("c0a666"))
-	knob.rotation.x = PI/2
-	for x in [-size.x/2+.27, size.x/2-.27]:
-		for z in [-size.z/2+.24, size.z/2-.24]:
-			box(house, Vector3(x, size.y*.47, z), Vector3(.18, size.y*.84, .18), Color("65503d"))
-	box(house, Vector3(-size.x/3, size.y + 1.0, -1), Vector3(0.7, 2, 0.7), Color("8b8a7b"))
+func _building(scene: PackedScene, pos: Vector3, size: Vector3, angle: float = 0.0) -> void:
+	var house := _asset(scene, pos, angle)
+	_solid(house, Vector3(0, size.y/2, 0), size)
+	# Roof camera collision follows the ridge, while door access stays outside the shell.
+	_solid(house, Vector3(0, size.y + 0.55, 0), Vector3(size.x * 0.62, 1.1, size.z))
 
 func _buildings() -> void:
-	_building(Vector3(-12, 0, -12), Vector3(7, 3.6, 6), Color("845c43"))
-	_building(Vector3(12, 0, -12), Vector3(7, 4.4, 6), Color("607177"))
-	_building(Vector3(-13, 0, 2), Vector3(5, 3.2, 5), Color("6a5847"))
-	_building(Vector3(13, 0, 2), Vector3(5, 3.2, 5), Color("8c6c52"))
+	_building(WORKSHOP, Vector3(-12, 0, -12), Vector3(7, 3.6, 5.6))
+	_building(TOWNHOUSE, Vector3(12, 0, -12), Vector3(5.5, 4.25, 4.7))
+	_building(WORKSHOP, Vector3(-13, 0, 2), Vector3(7, 3.6, 5.6))
+	_building(COTTAGE, Vector3(13, 0, 2), Vector3(5, 3.15, 4))
 	for pos in [Vector3(-25, 0, 17), Vector3(-15, 0, 24), Vector3(25, 0, 20), Vector3(14, 0, 26)]:
-		_building(pos, Vector3(5, 3, 4), Color("8c7857"))
-	# Market awning and finite goods on display.
-	for x in [-11, -5]: box(self, Vector3(x, 1.5, -7), Vector3(0.15, 3, 0.15), Color("64513b"), true)
-	box(self, Vector3(-8, 3, -7), Vector3(6.3, 0.15, 3), Color("a17a5a"))
-	for x in [-10.5, -8.7, -6.9, -5.2]:
-		box(self, Vector3(x, 2.95, -5.4), Vector3(.85, .06, .18), Color("d6c08c"))
-	for x in [-10, -8, -6]:
-		box(self, Vector3(x, 1, -7), Vector3(1.5, 1.1, 1.1), Color("8a704e"), true)
-		cylinder(self, Vector3(x, 1.7, -7), 0.35, 0.3, 0.35, Color("a5a273"))
-	box(self, Vector3(-8, 0.55, 5), Vector3(1.3, 1.1, 1), Color("626b6b"), true)
+		_building(COTTAGE, pos, Vector3(5, 3.15, 4))
+	_building(TOWNHOUSE, Vector3(-29, 0, -10), Vector3(5.5, 4.25, 4.7), 0.18)
+	_building(COTTAGE, Vector3(29, 0, -8), Vector3(5, 3.15, 4), -0.15)
+	_asset(MARKET, Vector3(-8, 0, -7))
+	for x in [-10.7, -5.3]:
+		for z in [-8.15, -5.85]: _solid(self, Vector3(x, 1.55, z), Vector3(.14, 3.1, .14))
+	for x in [-9.8, -8, -6.2]: _solid(self, Vector3(x, .52, -6.9), Vector3(1.7, 1.04, 1.2))
+	# Workshop anvil and outdoor cargo make the service positions legible.
+	box(self, Vector3(-8, 0.55, 5), Vector3(1.3, 1.1, 1), Color("434c49"), true)
 	box(self, Vector3(-8, 1.2, 5), Vector3(1.9, 0.25, 0.65), Color("596368"))
-	for i in range(4):
-		var particle = cylinder(self, Vector3(-14.6, 5.3 + i * 0.7, 1), 0.3 + i*0.2, 0.4 + i*0.2, 0.5, Color("bab8a6"))
-		smoke.append(particle)
+	_asset(CART, Vector3(-18, 0, -4), 0.4)
+	_solid(self, Vector3(-18, .75, -4), Vector3(1.7, 1.5, 1.9))
+	_asset(CART, Vector3(18, 0, -4), -0.6)
+	_solid(self, Vector3(18, .75, -4), Vector3(1.7, 1.5, 1.9))
+	for pos in [Vector3(-16, 0, 5), Vector3(-17, 0, 4.5), Vector3(16, 0, 5), Vector3(10, 0, -8)]:
+		_asset(BARREL, pos, rng.randf_range(0, TAU))
+		_solid(self, pos + Vector3(0, .48, 0), Vector3(.67, .96, .67))
 	# Palisade and northern road.
 	for x in range(-17, 18):
 		if absi(x) < 3: continue
@@ -248,8 +268,7 @@ func _detail_village() -> void:
 		physical_material.bounce = 0.03
 		cargo.physics_material_override = physical_material
 		add_child(cargo)
-		box(cargo, Vector3.ZERO, Vector3(.65, .72, .65), Color("70573b"))
-		for y in [-.27, .27]: box(cargo, Vector3(0, y, 0), Vector3(.72, .09, .72), Color("a18155"))
+		_asset(CRATE, Vector3(0, -.36, 0), 0.0, 1.0, cargo)
 		var collision := CollisionShape3D.new()
 		var shape := BoxShape3D.new()
 		shape.size = Vector3(.65, .72, .65)
@@ -257,10 +276,7 @@ func _detail_village() -> void:
 		cargo.add_child(collision)
 
 func _tree(pos: Vector3, height: float) -> void:
-	cylinder(self, pos + Vector3(0, height*0.25, 0), 0.25, 0.18, height * 0.5, Color("66533e"), 6)
-	for i in range(3):
-		var color = [Color("3e5e48"), Color("4e6a4e"), Color("5c7656")][i]
-		cylinder(self, pos + Vector3(0, height*(0.45+i*0.18), 0), height*(0.32-i*0.07), 0, height*0.55, color, 7)
+	_asset(OAK, pos, rng.randf_range(0, TAU), height / 5.5)
 
 func _forest() -> void:
 	for i in range(90):
@@ -332,37 +348,27 @@ func _person(appearance: String, scale_factor: float = 1.0) -> Node3D:
 	physical.add_child(collider)
 	return person
 
-func _pose(skeleton: Skeleton3D, stride: float, moving: bool) -> void:
-	if skeleton == null: return
-	var key = skeleton.get_instance_id()
-	if not base_rotations.has(key):
-		var original := {}
-		for name in ["Thigh_L", "Thigh_R", "UpperArm_L", "UpperArm_R"]:
-			var bone = skeleton.find_bone(name)
-			if bone >= 0: original[name] = skeleton.get_bone_pose_rotation(bone)
-		base_rotations[key] = original
-	var travel := sin(stride) * (0.34 if moving else 0.018)
-	for name in ["Thigh_L", "UpperArm_R"]:
-		var index = skeleton.find_bone(name)
-		if index >= 0: skeleton.set_bone_pose_rotation(index, base_rotations[key][name] * Quaternion(Vector3.RIGHT, travel))
-	for name in ["Thigh_R", "UpperArm_L"]:
-		var index = skeleton.find_bone(name)
-		if index >= 0: skeleton.set_bone_pose_rotation(index, base_rotations[key][name] * Quaternion(Vector3.RIGHT, -travel))
-
 func update(world: RefCounted, elapsed: float) -> void:
+	var delta = maxf(elapsed - last_update_time, 0.001)
+	last_update_time = elapsed
 	for i in range(villagers.size()):
 		var node: Node3D = villagers[i]
 		var previous = node.position
 		node.position = world.npc_position(i)
+		node.position.y = -0.05 # Match the ground collider and the authored sole origin.
 		var motion = node.position - previous
-		if motion.length() > 0.005: node.rotation.y = atan2(motion.x, motion.z)
-		_pose(skeletons[i], elapsed * 5.0 + i, motion.length() > 0.005)
-		node.position.y = absf(sin(elapsed * 5.0 + i)) * 0.023 if motion.length() > 0.005 else 0
+		if motion.length() > 0.001: node.rotation.y = atan2(-motion.x, -motion.z)
+		character_animations[i].update(motion.length() / delta)
 	guardian.visible = world.state.enemy.hp > 0
+	var previous_guardian_position = guardian.position
 	guardian.position = Catalog.vec(world.state.enemy.position)
+	guardian.position.y = -0.05
 	var toward = Catalog.vec(world.state.player.position) - guardian.position
-	guardian.rotation.y = atan2(toward.x, toward.z)
-	_pose(guardian_skeleton, elapsed * 5.5, world.state.enemy.hp > 0 and toward.length() < 13)
+	guardian.rotation.y = atan2(-toward.x, -toward.z)
+	if world.state.enemy.next_attack > last_enemy_attack:
+		last_enemy_attack = world.state.enemy.next_attack
+		guardian_animation.attack()
+	guardian_animation.update(guardian.position.distance_to(previous_guardian_position) / delta)
 	gate.rotation.z = 0 if world.state.repaired else 0.12
 	for i in range(smoke.size()): smoke[i].position.x = -14.6 + sin(elapsed * 0.45 + i) * 0.3
 

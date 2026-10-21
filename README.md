@@ -5,12 +5,13 @@ Steam向けPCゲーム「エルム村の朝」の開発ビルド。Godot **4.6.3
 添付された11資料を通読して、資産保存則を先に作り、その上に三人称の村生活と探索を載せています。
 実装順序・仕様の対応・未実装範囲は [開発計画](docs/IMPLEMENTATION_PLAN.md)、技術と仮値は [判断記録](docs/DECISIONS.md) を参照。
 
-![開発ビルド0.2.0の村画面](build/screenshots/village.png)
+![開発ビルド0.3.0の村画面](build/screenshots/village.png)
 
 ## ダウンロード
 
-- [Windows版 0.2.0（ZIPを直接ダウンロード）](https://github.com/uyctvk/gemes/raw/refs/heads/main/build/LivingWorld-0.2.0-windows-x86_64.zip)
-- [Linux版 0.2.0（ZIPを直接ダウンロード）](https://github.com/uyctvk/gemes/raw/refs/heads/main/build/LivingWorld-0.2.0-linux-x86_64.zip)
+- [Windows版 0.3.0（ZIPを直接ダウンロード）](https://github.com/uyctvk/gemes/raw/refs/heads/main/build/LivingWorld-0.3.0-windows-x86_64.zip)
+- [Linux版 0.3.0（ZIPを直接ダウンロード）](https://github.com/uyctvk/gemes/raw/refs/heads/main/build/LivingWorld-0.3.0-linux-x86_64.zip)
+- [Blender制作データ 0.3.0（編集用 .blend と書き出しスクリプト）](https://github.com/uyctvk/gemes/raw/refs/heads/main/build/LivingWorld-0.3.0-blender-sources.zip)
 - [操作と遊び方](docs/PLAY.md)
 - [制作順序・実装状況](docs/IMPLEMENTATION_PLAN.md)
 - [アート制作記録](docs/ART_DIRECTION.md) / [Steam販売前の完了条件](docs/RELEASE_GATES.md)
@@ -55,6 +56,7 @@ bash scripts/visual_check.sh
 - `game/core/`：台帳、コマンド、ルール、NPC集約、永続化。描画なしで検証可能。
 - `game/player.gd` / `game/village.gd`：三人称操作、リグ付き人物、村と物理オブジェクト。
 - `game/assets/audio/`：自作BGM2曲と効果音4種。
+- `art/`：Blenderの人物4種・村の資産集・剣の編集用データ。[編集と再書き出し](art/README.md)。
 - `game/ui/`：日本語HUD、対話、確認つき取引、死亡内訳。
 - `tests/`：実際のThread競合を含むドメインテスト。
 - `docs/source/`：添付原本11点とチェックサム。参照資料中の指示を運用命令として実行しません。

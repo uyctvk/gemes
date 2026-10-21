@@ -150,9 +150,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("journal"): ui.show_journal()
 	elif event.is_action_pressed("heal"): act("heal")
 	elif event.is_action_pressed("attack"):
-		player.swing = 1.0
 		player.face_camera()
-		act("attack")
+		if act("attack").ok: player.begin_attack()
 	elif event.is_action_pressed("interact") and not target.is_empty(): _interact()
 
 func _interact() -> void:
@@ -241,22 +240,39 @@ func load_settings() -> void:
 	player.camera.fov = clampf(float(config.get_value("display", "fov", 78)), 65, 100)
 	music_volume = clampf(float(config.get_value("audio", "music_volume", 0.55)), 0, 1)
 
+func _smoke_check(condition: bool, message: String) -> bool:
+	# GDScript assert is removed from release exports; this check also runs there.
+	if condition: return true
+	push_error("SCENE_SMOKE_FAIL: " + message)
+	_stop_audio()
+	get_tree().quit(1)
+	return false
+
 func _smoke_run() -> void:
 	# Scene integration test uses an isolated --save-dir supplied by scripts/check.sh.
 	new_game()
 	await get_tree().process_frame
+	if not _smoke_check(player.character_animation.clips.size() == 4, "All four authored Blender clips must import"): return
+	var knees = [player.visual_skeleton.find_bone("Shin_L"), player.visual_skeleton.find_bone("Shin_R")]
+	var knees_at_rest = [player.visual_skeleton.get_bone_pose_rotation(knees[0]), player.visual_skeleton.get_bone_pose_rotation(knees[1])]
+	var knee_motion := 0.0
 	var spawn = player.position
 	Input.action_press("move_forward")
-	await get_tree().create_timer(0.4).timeout
+	for sample in range(5):
+		await get_tree().create_timer(0.1).timeout
+		for i in range(2):
+			knee_motion = maxf(knee_motion, knees_at_rest[i].angle_to(player.visual_skeleton.get_bone_pose_rotation(knees[i])))
 	Input.action_release("move_forward")
-	assert(spawn.distance_to(player.position) > 0.5, "Input must move the physics character")
-	assert(player.visual_skeleton != null and village.skeletons.size() == 30, "Rigged human models must be present")
+	if not _smoke_check(spawn.distance_to(player.position) > 0.5, "Input must move the physics character"): return
+	if not _smoke_check(player.character_animation.player.current_animation == player.character_animation.clips.run, "Moving must play the authored run clip"): return
+	if not _smoke_check(knee_motion > 0.02, "The locomotion clip must articulate the knees"): return
+	if not _smoke_check(player.visual_skeleton != null and village.skeletons.size() == 30, "Rigged human models must be present"): return
 	var turn_start = player.position
 	player.camera_rig.rotation.y = PI / 2
 	Input.action_press("move_forward")
 	await get_tree().create_timer(0.35).timeout
 	Input.action_release("move_forward")
-	assert(absf(player.position.x - turn_start.x) > 0.5, "Movement must follow the third-person camera")
+	if not _smoke_check(absf(player.position.x - turn_start.x) > 0.5, "Movement must follow the third-person camera"): return
 	player.camera_rig.rotation.y = 0
 	var cargo: RigidBody3D = village.find_children("*", "RigidBody3D", true, false).front()
 	cargo.global_position = Vector3(0, 0.55, 8)
@@ -267,11 +283,18 @@ func _smoke_run() -> void:
 	Input.action_press("move_forward")
 	await get_tree().create_timer(0.9).timeout
 	Input.action_release("move_forward")
-	assert(cargo.global_position.z < cargo_start - 0.1, "CharacterBody must push rigid cargo")
+	if not _smoke_check(cargo.global_position.z < cargo_start - 0.1, "CharacterBody must push rigid cargo"): return
 	print("PHYSICS_SMOKE: PASS")
-	assert(ui.vitals.get_global_rect().position.y > 0, "Vitals must be on screen")
-	assert(ui.objective.get_global_rect().position.x > 0, "Objective must be on screen")
-	assert(ui.objective.get_global_rect().end.x <= get_viewport().get_visible_rect().size.x, "Objective must fit viewport")
+	player.begin_attack()
+	await get_tree().create_timer(0.15).timeout
+	if not _smoke_check(player.character_animation.attacking, "An accepted attack must play its authored clip"): return
+	await get_tree().create_timer(1.1).timeout
+	if not _smoke_check(not player.character_animation.attacking, "An attack must return to locomotion"): return
+	if not _smoke_check(player.weapon.get_parent() is BoneAttachment3D, "The Blender weapon must follow the hand bone"): return
+	print("ANIMATION_SMOKE: PASS")
+	if not _smoke_check(ui.vitals.get_global_rect().position.y > 0, "Vitals must be on screen"): return
+	if not _smoke_check(ui.objective.get_global_rect().position.x > 0, "Objective must be on screen"): return
+	if not _smoke_check(ui.objective.get_global_rect().end.x <= get_viewport().get_visible_rect().size.x, "Objective must fit viewport"): return
 	for page in ["market", "vault", "board", "forge", "apothecary", "trainer"]:
 		ui.show_page(page)
 		await get_tree().process_frame
@@ -283,7 +306,7 @@ func _smoke_run() -> void:
 	await get_tree().process_frame
 	set_text_scale(1.15)
 	await get_tree().process_frame
-	assert(ui.modal.get_global_rect().position.y >= 0, "Enlarged menu must fit viewport")
+	if not _smoke_check(ui.modal.get_global_rect().position.y >= 0, "Enlarged menu must fit viewport"): return
 	set_text_scale(1.0)
 	ui.close()
 	await get_tree().create_timer(1).timeout
@@ -300,7 +323,7 @@ func _capture() -> void:
 	started = true
 	last_event_index = world.state.events.size()
 	ui.close()
-	player.position = Vector3(3, 0.1, 16)
+	player.position = Vector3(1, 0.1, 16)
 	player.rotation.y = 0.1
 	player.camera_rig.rotation.y = 0.1
 	await get_tree().create_timer(2).timeout
@@ -309,6 +332,22 @@ func _capture() -> void:
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png("/tmp/living-world-market.png")
+	# Inspect the imported model and a held-weapon pose independently of the HUD.
+	ui.visible = false
+	player.set_physics_process(false)
+	player.weapon.show()
+	player.camera_rig.rotation.y = PI + 0.3
+	player.spring_arm.spring_length = 2.9
+	player.spring_arm.rotation.x = -0.08
+	player.camera.fov = 55
+	player.character_animation.update(0)
+	await get_tree().create_timer(0.4).timeout
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("/tmp/living-world-character.png")
+	player.begin_attack()
+	await get_tree().create_timer(0.35).timeout
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("/tmp/living-world-attack.png")
 	_stop_audio()
 	await get_tree().create_timer(0.1).timeout
 	get_tree().quit()

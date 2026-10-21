@@ -60,7 +60,7 @@ cat "$RUN_DIRECTORY/game.log"
 if rg -q 'SCRIPT ERROR|^ERROR:' "$RUN_DIRECTORY/game.log"; then exit 1; fi
 mkdir -p build/screenshots
 touch build/.gdignore
-for name in title village market; do
+for name in title village market character attack; do
   test -s "/tmp/living-world-$name.png"
   cp "/tmp/living-world-$name.png" "build/screenshots/$name.png"
 done

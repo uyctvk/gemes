@@ -2,3 +2,6 @@
 28177eafd922fb36840e1e1b10d6cda5fae85ad3251292cdc845a2691e92e93b  LivingWorld-0.1.0-windows-x86_64.zip
 23271fb970a89fd21da608cb38fcbc447572878a6ec34c25899d941808cc49a2  LivingWorld-0.2.0-linux-x86_64.zip
 d1824ed0d4e39dbf83bc2ffa848a6f4f8f2c2f619d095075ca74cebd566b01f3  LivingWorld-0.2.0-windows-x86_64.zip
+bc01aa2dddaac12acdc8b0c05f868a2a514a28b708b0fb09df980f7326bca320  LivingWorld-0.3.0-blender-sources.zip
+bd8d8f5da2e295785b9f0fcf848626d0a1708543669cb806b24e585826bba9f0  LivingWorld-0.3.0-linux-x86_64.zip
+dcd55f8a526bef39fa8f3c5a9a6c7b42ca091928c9dfaf7bdec9a8efa18f1a9e  LivingWorld-0.3.0-windows-x86_64.zip

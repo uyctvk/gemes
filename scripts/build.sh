@@ -16,14 +16,22 @@ for platform in windows linux; do
 done
 python3 - <<'PY'
 from pathlib import Path
-import hashlib, zipfile
+import hashlib, re, zipfile
 root=Path('build')
+version=re.search(r'config/version="([^"]+)"',Path('project.godot').read_text()).group(1)
 for platform in ['windows','linux']:
-    archive=root/f'LivingWorld-0.2.0-{platform}-x86_64.zip'
+    archive=root/f'LivingWorld-{version}-{platform}-x86_64.zip'
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
         for p in sorted((root/platform).iterdir()):
             z.write(p,arcname=p.name)
     print(archive,archive.stat().st_size,'bytes')
+sources = sorted(p for p in Path('art').rglob('*') if p.is_file() and (p.suffix in ('.blend','.png','.md','.json') or p.name == '.gdignore'))
+sources += sorted(Path('scripts').glob('generate_*.py'))
+sources += [Path('scripts/render_character.py'),Path('scripts/export_blender_sources.py'),Path('docs/ART_DIRECTION.md')]
+archive=root/f'LivingWorld-{version}-blender-sources.zip'
+with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
+    for p in sources: z.write(p,arcname=str(p))
+print(archive,archive.stat().st_size,'bytes')
 (root/'SHA256SUMS.txt').write_text(''.join(
     f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n'
     for p in sorted(root.glob('*.zip'))))

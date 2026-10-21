@@ -248,7 +248,7 @@ func show_title() -> void:
 	label("生きる、働く、世界とともに。", 28)
 	label("エルム村の朝", 42, GOLD)
 	label("見知らぬ村で、あなたはまだ「無垢」。\n森の恵みを集め、職人に届け、最初の道を見つけよう。\n人々の仕事も、ものの価値も、あなたの行動で変わっていく。", 21)
-	label("開発版  0.2  ·  1村 / 30人の住民", 17, MUTED)
+	label("開発版  %s  ·  1村 / 30人の住民" % ProjectSettings.get_setting("application/config/version"), 17, MUTED)
 	if FileAccess.file_exists(game.world.save_path) or FileAccess.file_exists(game.world.save_path + ".bak"):
 		button("旅を続ける", func(): game.continue_game())
 		button("新しい旅を始める", func(): confirm("新しい旅", "現在のセーブを新しい村で置き換えます。旧セーブは別ファイルに保管します。", func(): game.new_game()))
