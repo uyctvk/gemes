@@ -5,6 +5,14 @@ Steam向けPCゲームの最初のプレイアブル試作「エルム村の朝�
 添付された11資料を通読して、資産保存則を先に作り、その上に一人称の村生活と探索を載せています。
 実装順序・仕様の対応・未実装範囲は [開発計画](docs/IMPLEMENTATION_PLAN.md)、技術と仮値は [判断記録](docs/DECISIONS.md) を参照。
 
+## ダウンロード
+
+- [Windows試作版 0.1.0（ZIP、約35 MB）](https://github.com/uyctvk/gemes/raw/refs/heads/main/build/LivingWorld-0.1.0-windows-x86_64.zip)
+- [操作と遊び方](docs/PLAY.md)
+- [制作順序・実装状況](docs/IMPLEMENTATION_PLAN.md)
+
+ZIPのSHA-256：`28177eafd922fb36840e1e1b10d6cda5fae85ad3251292cdc845a2691e92e93b`
+
 ## 起動
 
 ```bash
