@@ -17,6 +17,11 @@ var session_id := ""
 var last_event_index := 0
 var text_scale := 1.0
 var font: Font
+var village_music: AudioStreamPlayer
+var ruins_music: AudioStreamPlayer
+var effects: AudioStreamPlayer
+var music_volume := 0.55
+var danger_mix := 0.0
 
 func _ready() -> void:
 	_setup_input()
@@ -37,11 +42,36 @@ func _ready() -> void:
 	ui = Interface.new()
 	add_child(ui)
 	ui.setup(self, font)
+	_setup_audio()
 	load_settings()
 	set_text_scale(text_scale)
 	get_tree().auto_accept_quit = false
 	if "--smoke" in OS.get_cmdline_user_args(): _smoke_run.call_deferred()
 	if "--capture" in OS.get_cmdline_user_args(): _capture.call_deferred()
+
+func _setup_audio() -> void:
+	village_music = AudioStreamPlayer.new()
+	village_music.stream = load("res://game/assets/audio/village.ogg")
+	(village_music.stream as AudioStreamOggVorbis).loop = true
+	add_child(village_music)
+	ruins_music = AudioStreamPlayer.new()
+	ruins_music.stream = load("res://game/assets/audio/ruins.ogg")
+	(ruins_music.stream as AudioStreamOggVorbis).loop = true
+	add_child(ruins_music)
+	effects = AudioStreamPlayer.new()
+	add_child(effects)
+	village_music.play()
+	ruins_music.play()
+
+func sound(name: String) -> void:
+	if name not in ["ui", "swing", "gather", "step"]: return
+	effects.stream = load("res://game/assets/audio/" + name + ".wav")
+	effects.volume_db = -15 if name == "step" else -8
+	effects.play()
+
+func set_music_volume(value: float) -> void:
+	music_volume = clampf(value, 0, 1)
+	save_settings()
 
 func _setup_input() -> void:
 	var keys = {"move_forward": KEY_W, "move_back": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "sprint": KEY_SHIFT, "interact": KEY_E, "inventory": KEY_I, "journal": KEY_J, "heal": KEY_H, "pause": KEY_ESCAPE, "save": KEY_F5}
@@ -98,6 +128,10 @@ func act(action: String, args: Dictionary = {}) -> Dictionary:
 	request_sequence += 1
 	var result = world.command(session_id + ":" + str(request_sequence), action, args)
 	ui.toast(result.message)
+	if result.ok:
+		if action == "attack": sound("swing")
+		elif action == "gather": sound("gather")
+		else: sound("ui")
 	return result
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -117,6 +151,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("heal"): act("heal")
 	elif event.is_action_pressed("attack"):
 		player.swing = 1.0
+		player.face_camera()
 		act("attack")
 	elif event.is_action_pressed("interact") and not target.is_empty(): _interact()
 
@@ -152,6 +187,10 @@ func _process(delta: float) -> void:
 			if world.state.events[i].type in ["CRAFT_COMPLETED", "QUEST_EXPIRED", "WALL_REPAIRED"]: ui.toast(world.state.events[i].message)
 		last_event_index = world.state.events.size()
 	village.update(world, elapsed)
+	var target_danger = 1.0 if started and player.position.z < -27 else 0.0
+	danger_mix = move_toward(danger_mix, target_danger, delta * 0.35)
+	village_music.volume_db = linear_to_db(maxf(0.001, music_volume * (1.0 - danger_mix)))
+	ruins_music.volume_db = linear_to_db(maxf(0.001, music_volume * danger_mix))
 	target = village.nearest(player.position, player.forward(), world) if started else {}
 	ui.update(delta, target)
 
@@ -164,7 +203,22 @@ func return_to_title() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		if started and not world.save(): ui.toast("保存できませんでした。F5で再試行してください。"); return
+		_stop_audio()
 		get_tree().quit()
+
+func _stop_audio() -> void:
+	if village_music != null:
+		village_music.stop()
+		village_music.stream = null
+	if ruins_music != null:
+		ruins_music.stop()
+		ruins_music.stream = null
+	if effects != null:
+		effects.stop()
+		effects.stream = null
+
+func _exit_tree() -> void:
+	_stop_audio()
 
 func set_text_scale(value: float) -> void:
 	text_scale = value
@@ -176,6 +230,7 @@ func save_settings() -> void:
 	config.set_value("display", "text_scale", text_scale)
 	config.set_value("input", "sensitivity", player.sensitivity)
 	config.set_value("display", "fov", player.camera.fov)
+	config.set_value("audio", "music_volume", music_volume)
 	config.save(world.save_path.get_base_dir() + "/settings.cfg")
 
 func load_settings() -> void:
@@ -184,6 +239,7 @@ func load_settings() -> void:
 	text_scale = clampf(float(config.get_value("display", "text_scale", 1.0)), 0.9, 1.15)
 	player.sensitivity = clampf(float(config.get_value("input", "sensitivity", 0.0022)), 0.0008, 0.005)
 	player.camera.fov = clampf(float(config.get_value("display", "fov", 78)), 65, 100)
+	music_volume = clampf(float(config.get_value("audio", "music_volume", 0.55)), 0, 1)
 
 func _smoke_run() -> void:
 	# Scene integration test uses an isolated --save-dir supplied by scripts/check.sh.
@@ -194,6 +250,25 @@ func _smoke_run() -> void:
 	await get_tree().create_timer(0.4).timeout
 	Input.action_release("move_forward")
 	assert(spawn.distance_to(player.position) > 0.5, "Input must move the physics character")
+	assert(player.visual_skeleton != null and village.skeletons.size() == 30, "Rigged human models must be present")
+	var turn_start = player.position
+	player.camera_rig.rotation.y = PI / 2
+	Input.action_press("move_forward")
+	await get_tree().create_timer(0.35).timeout
+	Input.action_release("move_forward")
+	assert(absf(player.position.x - turn_start.x) > 0.5, "Movement must follow the third-person camera")
+	player.camera_rig.rotation.y = 0
+	var cargo: RigidBody3D = village.find_children("*", "RigidBody3D", true, false).front()
+	cargo.global_position = Vector3(0, 0.55, 8)
+	cargo.linear_velocity = Vector3.ZERO
+	player.position = Vector3(0, 0.1, 10)
+	await get_tree().create_timer(0.35).timeout
+	var cargo_start = cargo.global_position.z
+	Input.action_press("move_forward")
+	await get_tree().create_timer(0.9).timeout
+	Input.action_release("move_forward")
+	assert(cargo.global_position.z < cargo_start - 0.1, "CharacterBody must push rigid cargo")
+	print("PHYSICS_SMOKE: PASS")
 	assert(ui.vitals.get_global_rect().position.y > 0, "Vitals must be on screen")
 	assert(ui.objective.get_global_rect().position.x > 0, "Objective must be on screen")
 	assert(ui.objective.get_global_rect().end.x <= get_viewport().get_visible_rect().size.x, "Objective must fit viewport")
@@ -214,6 +289,8 @@ func _smoke_run() -> void:
 	await get_tree().create_timer(1).timeout
 	var issues = world.audit()
 	print("SCENE_SMOKE: ", "PASS" if issues.is_empty() else issues)
+	_stop_audio()
+	await get_tree().create_timer(0.1).timeout
 	get_tree().quit(0 if issues.is_empty() else 1)
 
 func _capture() -> void:
@@ -225,10 +302,13 @@ func _capture() -> void:
 	ui.close()
 	player.position = Vector3(3, 0.1, 16)
 	player.rotation.y = 0.1
+	player.camera_rig.rotation.y = 0.1
 	await get_tree().create_timer(2).timeout
 	get_viewport().get_texture().get_image().save_png("/tmp/living-world-village.png")
 	ui.show_market()
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png("/tmp/living-world-market.png")
+	_stop_audio()
+	await get_tree().create_timer(0.1).timeout
 	get_tree().quit()

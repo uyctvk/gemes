@@ -19,7 +19,7 @@ from pathlib import Path
 import hashlib, zipfile
 root=Path('build')
 for platform in ['windows','linux']:
-    archive=root/f'LivingWorld-0.1.0-{platform}-x86_64.zip'
+    archive=root/f'LivingWorld-0.2.0-{platform}-x86_64.zip'
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
         for p in sorted((root/platform).iterdir()):
             z.write(p,arcname=p.name)

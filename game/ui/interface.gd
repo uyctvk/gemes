@@ -1,6 +1,7 @@
 extends CanvasLayer
 ## Reusable native UI. All buttons dispatch commands through the local authority.
 const Catalog = preload("res://game/core/catalog.gd")
+const Minimap = preload("res://game/ui/minimap.gd")
 const INK = Color("eff0d9")
 const MUTED = Color("a8b9a8")
 const GOLD = Color("d7b878")
@@ -14,6 +15,11 @@ var body: VBoxContainer
 var title: Label
 var status: Label
 var vitals: Label
+var health_bar: ProgressBar
+var stamina_bar: ProgressBar
+var load_label: Label
+var item_label: Label
+var minimap: Control
 var objective: Label
 var prompt: Label
 var toast_label: Label
@@ -85,57 +91,86 @@ func _panel(parent: Node, pos: Vector2, size: Vector2) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.position = pos
 	panel.size = size
-	panel.add_theme_stylebox_override("panel", _style(Color(0.06,0.12,0.1,0.88)))
+	panel.add_theme_stylebox_override("panel", _style(Color(0.025,0.07,0.07,0.82), Color("8d8061")))
 	parent.add_child(panel)
 	return panel
+
+func _gauge(parent: Node, fill_color: Color) -> ProgressBar:
+	var bar := ProgressBar.new()
+	bar.custom_minimum_size = Vector2(315, 16)
+	bar.max_value = 100
+	bar.value = 100
+	bar.show_percentage = false
+	var backdrop := _style(Color("0a1719"), Color("4c574c"))
+	backdrop.set_content_margin_all(0)
+	var fill := _style(fill_color, fill_color.darkened(0.28))
+	fill.set_content_margin_all(0)
+	bar.add_theme_stylebox_override("background", backdrop)
+	bar.add_theme_stylebox_override("fill", fill)
+	parent.add_child(bar)
+	return bar
 
 func _build_hud() -> void:
 	hud = Control.new()
 	hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(hud)
-	var top = _panel(hud, Vector2(28, 26), Vector2(310, 102))
+	var top = _panel(hud, Vector2(24, 20), Vector2(403, 172))
 	var top_box := VBoxContainer.new()
+	top_box.add_theme_constant_override("separation", 5)
 	top.add_child(top_box)
-	label("L I V I N G   W O R L D", 17, GOLD, top_box)
-	status = label("エルム村", 22, INK, top_box)
-	var guide = _panel(hud, Vector2(1030, 26), Vector2(382, 170))
+	label("◆  L I V I N G   W O R L D", 17, GOLD, top_box)
+	status = label("エルム村", 18, INK, top_box)
+	label("生命", 14, MUTED, top_box)
+	health_bar = _gauge(top_box, Color("8cb995"))
+	label("持久力", 14, MUTED, top_box)
+	stamina_bar = _gauge(top_box, Color("d3ba79"))
+	vitals = label("", 16, INK, top_box)
+	var guide = _panel(hud, Vector2(1030, 26), Vector2(382, 126))
 	guide.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	guide.offset_left = -410
 	guide.offset_right = -28
-	guide.offset_top = 26
-	guide.offset_bottom = 196
+	guide.offset_top = 20
+	guide.offset_bottom = 146
 	var guide_box := VBoxContainer.new()
 	guide.add_child(guide_box)
-	label("旅の手帳", 16, GOLD, guide_box)
-	objective = label("", 18, INK, guide_box)
-	var bottom = _panel(hud, Vector2(28, -126), Vector2(540, 98))
-	bottom.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	bottom.offset_left = 28
-	bottom.offset_right = 568
-	bottom.offset_top = -126
-	bottom.offset_bottom = -28
-	vitals = label("", 19, INK, bottom)
-	var keys = label("WASD 移動   Shift 走る   E 調べる\nI 荷物   J 手帳   H 傷薬   Esc メニュー", 16, INK, hud)
-	keys.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	keys.offset_left = -450
-	keys.offset_right = -30
-	keys.offset_top = -100
-	keys.offset_bottom = -25
-	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	var cross = label("·", 38, INK, hud)
+	label("◆  現在の目的", 16, GOLD, guide_box)
+	objective = label("", 17, INK, guide_box)
+	var map_panel = _panel(hud, Vector2(25, -250), Vector2(252, 224))
+	map_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	map_panel.offset_left = 25
+	map_panel.offset_right = 277
+	map_panel.offset_top = -250
+	map_panel.offset_bottom = -26
+	minimap = Minimap.new()
+	minimap.custom_minimum_size = Vector2(212, 212)
+	map_panel.add_child(minimap)
+	var gear = _panel(hud, Vector2(-346, -166), Vector2(320, 140))
+	gear.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	gear.offset_left = -346
+	gear.offset_right = -26
+	gear.offset_top = -166
+	gear.offset_bottom = -26
+	var gear_box := VBoxContainer.new()
+	gear_box.add_theme_constant_override("separation", 7)
+	gear.add_child(gear_box)
+	label("装備と道具", 16, GOLD, gear_box)
+	item_label = label("", 19, INK, gear_box)
+	load_label = label("", 15, MUTED, gear_box)
+	label("左クリック 攻撃   H 傷薬   E 調べる", 15, MUTED, gear_box)
+	var cross = label("◇", 26, GOLD, hud)
 	cross.set_anchors_preset(Control.PRESET_CENTER)
-	cross.offset_left = -10
-	cross.offset_right = 10
-	cross.offset_top = -29
-	cross.offset_bottom = 21
+	cross.offset_left = -14
+	cross.offset_right = 14
+	cross.offset_top = -18
+	cross.offset_bottom = 18
 	cross.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	prompt = label("", 22, INK, hud)
 	prompt.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	prompt.offset_left = -330
-	prompt.offset_right = 330
-	prompt.offset_top = -185
-	prompt.offset_bottom = -137
+	prompt.offset_left = -300
+	prompt.offset_right = 300
+	prompt.offset_top = -126
+	prompt.offset_bottom = -80
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	toast_label = label("", 21, GOLD, hud)
 	toast_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
@@ -213,7 +248,7 @@ func show_title() -> void:
 	label("生きる、働く、世界とともに。", 28)
 	label("エルム村の朝", 42, GOLD)
 	label("見知らぬ村で、あなたはまだ「無垢」。\n森の恵みを集め、職人に届け、最初の道を見つけよう。\n人々の仕事も、ものの価値も、あなたの行動で変わっていく。", 21)
-	label("初期プレイアブル版  0.1  ·  1村 / 30人の住民", 17, MUTED)
+	label("開発版  0.2  ·  1村 / 30人の住民", 17, MUTED)
 	if FileAccess.file_exists(game.world.save_path) or FileAccess.file_exists(game.world.save_path + ".bak"):
 		button("旅を続ける", func(): game.continue_game())
 		button("新しい旅を始める", func(): confirm("新しい旅", "現在のセーブを新しい村で置き換えます。旧セーブは別ファイルに保管します。", func(): game.new_game()))
@@ -374,7 +409,15 @@ func show_death() -> void:
 
 func show_settings() -> void:
 	open("settings", "操作と設定")
-	label("WASD / 左スティック：移動\nマウス / 右スティック：視点\nE / A：調べる　左クリック / RT：攻撃\nShift / 左スティック押込：走る\nI / Y：荷物　J：手帳　H / X：傷薬\nEsc / B：戻る　F5：保存", 20)
+	label("WASD / 左スティック：カメラ相対で移動\nマウス / 右スティック：三人称カメラ\nE / A：調べる　左クリック / RT：攻撃\nShift / 左スティック押込：走る\nI / Y：荷物　J：手帳　H / X：傷薬\nEsc / B：戻る　F5：保存", 20)
+	label("音楽の音量", 21, GOLD)
+	var volume_slider := HSlider.new()
+	volume_slider.min_value = 0
+	volume_slider.max_value = 1
+	volume_slider.step = 0.05
+	volume_slider.value = game.music_volume
+	volume_slider.value_changed.connect(func(value): game.set_music_volume(value))
+	body.add_child(volume_slider)
 	label("文字の大きさ", 21, GOLD)
 	var row := HBoxContainer.new()
 	body.add_child(row)
@@ -430,9 +473,14 @@ func update(delta: float, target: Dictionary) -> void:
 	var hour = int(state.clock / 60) % 24
 	var minute = int(state.clock) % 60
 	var area = "エルム村" if game.player.position.z > -27 else "北の遺跡  /  危険地帯"
-	status.text = "%s\n第%d日  %02d:%02d" % [area, day, hour, minute]
+	status.text = "%s    第%d日 %02d:%02d  ·  %s Lv.%d" % [area, day, hour, minute, state.player.job, state.player.level]
 	var load_info = game.world.load_for()
-	vitals.text = "体力 %d   スタミナ %d   %s Lv.%d\n携行 %d銅貨   %.1f kg / %.1f L  ·  %s" % [state.player.hp, state.player.stamina, state.player.job, state.player.level, state.accounts.player, load_info.weight/1000.0, load_info.volume/1000.0, load_info.tier.name]
+	health_bar.value = state.player.hp
+	stamina_bar.value = state.player.stamina
+	vitals.text = "体力 %d / 100   持久力 %d / 100" % [state.player.hp, state.player.stamina]
+	item_label.text = "剣 %s    傷薬 × %d" % ["装備" if not game.world.items_at("inventory", "sword").is_empty() else "素手", game.world.items_at("inventory", "medicine").size()]
+	load_label.text = "携行 %d銅貨    %.1f kg / %.1f L · %s" % [state.accounts.player, load_info.weight/1000.0, load_info.volume/1000.0, load_info.tier.name]
+	minimap.set_player(game.player.position, game.player.rotation.y)
 	if state.player.helped == 0: objective.text = "村の依頼をひとつ完了する\n北の掲示板で仕事を探そう。"
 	elif state.player.job == "無垢": objective.text = "最初の職業を見つける\n訓練3回か製造1回を達成し、訓練場の師匠へ。"
 	elif state.accounts.vault == 0 and game.world.items_at("vault").is_empty(): objective.text = "遠征の前に安全保管\n東の銀行へ品物か銅貨を預けよう。"

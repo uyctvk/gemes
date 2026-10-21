@@ -1,0 +1,4 @@
+6222ab61fc15025ee9cab3666cca9aa6bf93b8c2560813d6b08dc02347c0815d  LivingWorld-0.1.0-linux-x86_64.zip
+28177eafd922fb36840e1e1b10d6cda5fae85ad3251292cdc845a2691e92e93b  LivingWorld-0.1.0-windows-x86_64.zip
+23271fb970a89fd21da608cb38fcbc447572878a6ec34c25899d941808cc49a2  LivingWorld-0.2.0-linux-x86_64.zip
+d1824ed0d4e39dbf83bc2ffa848a6f4f8f2c2f619d095075ca74cebd566b01f3  LivingWorld-0.2.0-windows-x86_64.zip

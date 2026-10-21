@@ -14,6 +14,7 @@ run_checked() {
 run_checked "$RUN_DIRECTORY/import.log" bash scripts/godot.sh --headless --editor --import --quit
 run_checked "$RUN_DIRECTORY/domain.log" bash scripts/godot.sh --headless --script tests/run.gd
 rg -q 'RESULT: [1-9][0-9]* passed; 0 failed;' "$RUN_DIRECTORY/domain.log"
-run_checked "$RUN_DIRECTORY/scene.log" bash scripts/godot.sh --headless -- --smoke --save-dir="$RUN_DIRECTORY/scene"
+run_checked "$RUN_DIRECTORY/scene.log" timeout 60 bash scripts/godot.sh --headless -- --smoke --save-dir="$RUN_DIRECTORY/scene"
 rg -q 'SCENE_SMOKE: PASS' "$RUN_DIRECTORY/scene.log"
+rg -q 'PHYSICS_SMOKE: PASS' "$RUN_DIRECTORY/scene.log"
 printf 'Validation logs: %s\n' "$RUN_DIRECTORY"

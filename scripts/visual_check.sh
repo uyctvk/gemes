@@ -50,7 +50,12 @@ EOF
 fi
 export LIBGL_ALWAYS_SOFTWARE=1
 cd "$PROJECT_ROOT"
-bash scripts/godot.sh --audio-driver Dummy -- --capture --save-dir="$RUN_DIRECTORY/save" >"$RUN_DIRECTORY/game.log" 2>&1
+if [[ -n "${LW_VISUAL_EXECUTABLE:-}" ]]; then
+  export XDG_CACHE_HOME="$RUN_DIRECTORY/cache" XDG_CONFIG_HOME="$RUN_DIRECTORY/config" XDG_DATA_HOME="$RUN_DIRECTORY/data"
+  "$LW_VISUAL_EXECUTABLE" --audio-driver Dummy -- --capture --save-dir="$RUN_DIRECTORY/save" >"$RUN_DIRECTORY/game.log" 2>&1
+else
+  bash scripts/godot.sh --audio-driver Dummy -- --capture --save-dir="$RUN_DIRECTORY/save" >"$RUN_DIRECTORY/game.log" 2>&1
+fi
 cat "$RUN_DIRECTORY/game.log"
 if rg -q 'SCRIPT ERROR|^ERROR:' "$RUN_DIRECTORY/game.log"; then exit 1; fi
 mkdir -p build/screenshots

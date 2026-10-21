@@ -1,9 +1,9 @@
-; LIVING WORLD — native desktop prototype
+; LIVING WORLD — native desktop game
 config_version=5
 
 [application]
 config/name="LIVING WORLD"
-config/version="0.1.0"
+config/version="0.2.0"
 run/main_scene="res://game/scenes/main.tscn"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://game/assets/icon.svg"
