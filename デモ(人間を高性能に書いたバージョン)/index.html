@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>ASHEN FRONTIER | 冒険者の辺境</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
+</head>
+<body>
+<canvas id="world"></canvas>
+<div id="startup" class="veil">
+  <div class="startbox">
+    <div class="eyebrow">A PLAYABLE 3D FANTASY ADVENTURE <span class="dim">/ BUILD 01</span></div>
+    <div class="rune">✧</div>
+    <h1>ASHEN<br><em>FRONTIER</em></h1>
+    <p class="lead">霧深い辺境の村、眠れる遺跡、そして失われた古代の遺物。<br>一人の冒険者として探索し、戦い、選択せよ。</p>
+    <div class="startactions"><button id="begin" class="primary">▶ 冒険を始める</button><label class="file-btn">人物GLBを追加<input type="file" id="glbfile" accept=".glb"></label></div>
+    <div class="note" id="modelstatus">3D人物モデルの読込を確認しています（読み込めなくてもゲームは遊べます）。</div>
+    <div class="controls-line">WASD 移動　/　マウス 視点　/　左クリック 攻撃　/　E 調べる・話す<br>Shift ダッシュ　/　Q 回避　/　H 回復　/　Tab インベントリ　/　V 視点変更</div>
+    <small>Three.js版・PCブラウザ推奨　/　マウスロックはEscで解除</small>
+  </div>
+</div>
+<header class="topbar">
+  <div class="logo"><div class="logo-crest">✧</div><div>ASHEN <b>FRONTIER</b><span>THE BORDERLANDS · PROTOTYPE</span></div></div>
+  <div class="chapter">CHAPTER I <span>/</span> THE FORGOTTEN RELIC</div>
+  <div class="worldstatus"><span id="daytime">DAY 01 · 08:00</span><i>◉</i> <span id="zone">霧の辺境村</span></div>
+</header>
+<div class="questcard">
+ <div class="sectionlabel"><span class="accent">◆</span> MAIN QUEST <span class="quest-index">01 / 04</span></div>
+ <h2 id="questtitle">冒険者ギルドへの招待</h2><p id="questdesc">広場にいるギルド長アーリンと話す。</p>
+ <div class="progress-track"><div id="questbar"></div></div>
+ <div class="questmeta"><span id="questcount">クエスト開始前</span><span id="questdistance">—</span></div>
+</div>
+<div class="rightpanel">
+ <div class="mapcard"><div class="map-heading">BORDERLAND MAP <span>◈</span></div><canvas id="minimap" width="220" height="220"></canvas><div class="mapfooter"><span><i class="dot green"></i>村</span><span><i class="dot red"></i>敵</span><span><i class="dot yellow"></i>目標</span></div></div>
+ <div class="tips" id="tips">村のギルド長に話しかけて冒険を始めよう。</div>
+</div>
+<div class="reticle" id="reticle"><span></span><i></i><span></span></div>
+<div class="interaction" id="interaction" hidden><kbd>E</kbd><span id="interactlabel">話す</span></div>
+<div class="hitflash" id="hitflash"></div>
+<div class="bossbar" id="bossbar" hidden><div class="bossname">ANCIENT GUARDIAN <span>古代の守護者</span></div><div class="track"><div id="bossfill"></div></div></div>
+<div class="killmsg" id="killmsg"></div>
+<div id="toast" class="toast"></div>
+<div class="lowerhud">
+  <div class="vitals"><div class="levelrow"><strong>LV <span id="level">01</span></strong><span id="xp">XP 0 / 100</span><span id="coins">◈ 0 G</span></div>
+    <div class="meter hp"><span>HP</span><div><i id="hpbar" style="width:100%"></i></div><b id="hpnum">100 / 100</b></div>
+    <div class="meter stamina"><span>ST</span><div><i id="stbar" style="width:100%"></i></div><b id="stnum">100</b></div>
+    <div class="hotkeys"><span><kbd>H</kbd> 薬草 <b id="herb">2</b></span><span><kbd>Q</kbd> 回避</span><span><kbd>Tab</kbd> 持ち物</span></div>
+  </div>
+  <div class="combat"><div class="weaponlabel">EQUIPPED WEAPON <small>IRONBOUND</small></div><div class="weaponname">旅人の鋼剣 <span>Ⅰ</span></div><div class="combatsub">左クリック 攻撃 <i>•</i> 長押しで連撃 <i>•</i> 右クリック 防御</div></div>
+</div>
+<div class="dialogue" id="dialogue" hidden><div class="portrait">✧</div><div class="dialogue-body"><div class="speaker" id="speaker">冒険者ギルド長 アーリン</div><div id="dialoguetext"></div><div id="dialoguechoices"></div></div><button id="dialogclose">×</button></div>
+<div class="inventory veil" id="inventory" hidden><div class="inventorybox"><div class="invtop">ADVENTURER'S PACK <button id="closeinventory">×</button></div><h2>冒険者の持ち物</h2><div class="invgrid"><div><b>⚔</b> 旅人の鋼剣 <span>装備中</span></div><div><b>✿</b> 薬草 <span id="invherbs">× 2</span></div><div><b>◈</b> 金貨 <span id="invcoins">0 G</span></div><div><b>✦</b> 古代の遺物 <span id="invrelic">未入手</span></div></div><p>薬草：HキーでHPを35回復。クエストの進行状況は自動保存されます。</p><button class="primary small" id="backgame">冒険に戻る</button></div></div>
+<div class="pause veil" id="pause" hidden><div class="pausebox"><div class="eyebrow">ADVENTURE PAUSED</div><h2>一時停止</h2><p>マウスのロックが解除されています。</p><button id="resume" class="primary">冒険に戻る</button><button id="reset" class="warn">セーブデータを初期化</button></div></div>
+<div id="error" class="error" hidden></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
